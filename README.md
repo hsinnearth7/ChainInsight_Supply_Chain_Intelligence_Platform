@@ -108,7 +108,6 @@ This project simulates a real-world supply chain scenario: a 10,000+ row invento
 supply-chain-analysis/
 │
 ├── README.md                                           # This file
-├── CLAUDE.md                                           # AI assistant configuration
 ├── LICENSE                                             # MIT License
 ├── requirements.txt                                    # Python dependencies
 │
