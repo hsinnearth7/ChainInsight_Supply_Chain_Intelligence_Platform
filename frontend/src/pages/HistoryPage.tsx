@@ -1,0 +1,139 @@
+import { useEffect, useState } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { api } from '../api/client';
+import { useAppStore } from '../stores/appStore';
+import LoadingSpinner from '../components/LoadingSpinner';
+import type { PipelineRun, KPIData } from '../types/api';
+
+const STATUS_STYLES: Record<string, string> = {
+  completed: 'bg-ci-success/10 text-ci-success',
+  running: 'bg-ci-primary/10 text-ci-primary',
+  queued: 'bg-ci-warning/10 text-ci-warning',
+  failed: 'bg-ci-danger/10 text-ci-danger',
+  pending: 'bg-ci-gray/10 text-ci-gray',
+};
+
+export default function HistoryPage() {
+  const [runs, setRuns] = useState<PipelineRun[]>([]);
+  const [kpiHistory, setKpiHistory] = useState<KPIData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const setLatestBatchId = useAppStore((s) => s.setLatestBatchId);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  async function loadData() {
+    try {
+      const [runsData, historyData] = await Promise.all([
+        api.listRuns(),
+        api.getKPIHistory(20),
+      ]);
+      setRuns(runsData);
+      setKpiHistory(historyData);
+      if (runsData.length > 0 && runsData[0].status === 'completed') {
+        setLatestBatchId(runsData[0].batch_id);
+      }
+    } catch {
+      // no data
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (loading) return <LoadingSpinner text="Loading history..." />;
+
+  // Prepare KPI trend data
+  const trendData = kpiHistory
+    .slice()
+    .reverse()
+    .map((entry) => {
+      const kpis = entry.kpis as Record<string, number>;
+      return {
+        date: entry.completed_at?.slice(0, 10) || '—',
+        inventory_turnover: kpis.inventory_turnover,
+        avg_dsi: kpis.avg_dsi,
+        oos_rate: kpis.oos_rate,
+        total_value: kpis.total_inventory_value ? kpis.total_inventory_value / 1000 : undefined,
+      };
+    });
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-xl font-bold">Pipeline History</h2>
+
+      {/* KPI Trend Chart */}
+      {trendData.length > 1 && (
+        <div className="bg-white dark:bg-ci-dark-card rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <h3 className="text-sm font-medium mb-3">KPI Trends</h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={trendData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+              <YAxis yAxisId="left" />
+              <YAxis yAxisId="right" orientation="right" />
+              <Tooltip />
+              <Legend />
+              <Line yAxisId="left" type="monotone" dataKey="inventory_turnover" stroke="#2E86C1" name="Turnover" dot />
+              <Line yAxisId="left" type="monotone" dataKey="avg_dsi" stroke="#27AE60" name="Avg DSI" dot />
+              <Line yAxisId="left" type="monotone" dataKey="oos_rate" stroke="#E74C3C" name="OOS Rate %" dot />
+              <Line yAxisId="right" type="monotone" dataKey="total_value" stroke="#F39C12" name="Total Value ($k)" dot />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Runs Table */}
+      <div className="bg-white dark:bg-ci-dark-card rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-sm font-medium">Pipeline Runs ({runs.length})</h3>
+        </div>
+        <div className="overflow-auto max-h-[500px]">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">
+              <tr>
+                <th className="px-4 py-2 text-left text-xs font-medium text-ci-gray">Batch ID</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-ci-gray">Status</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-ci-gray">Source File</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-ci-gray">Started</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-ci-gray">Completed</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-ci-gray">Duration</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+              {runs.map((run) => {
+                const duration =
+                  run.started_at && run.completed_at
+                    ? `${Math.round((new Date(run.completed_at).getTime() - new Date(run.started_at).getTime()) / 1000)}s`
+                    : '—';
+                return (
+                  <tr key={run.batch_id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                    <td className="px-4 py-2 font-mono text-xs">{run.batch_id}</td>
+                    <td className="px-4 py-2">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[run.status] || ''}`}>
+                        {run.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 text-ci-gray text-xs truncate max-w-[200px]">
+                      {run.source_file?.split(/[/\\]/).pop() || '—'}
+                    </td>
+                    <td className="px-4 py-2 text-xs">{run.started_at ? new Date(run.started_at).toLocaleString() : '—'}</td>
+                    <td className="px-4 py-2 text-xs">{run.completed_at ? new Date(run.completed_at).toLocaleString() : '—'}</td>
+                    <td className="px-4 py-2 text-xs font-mono">{duration}</td>
+                  </tr>
+                );
+              })}
+              {runs.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-ci-gray">
+                    No pipeline runs yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
