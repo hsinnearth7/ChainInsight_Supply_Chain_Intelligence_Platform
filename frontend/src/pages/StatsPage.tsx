@@ -5,6 +5,7 @@ import { useAppStore } from '../stores/appStore';
 import ChartImage from '../components/ChartImage';
 import DataTable from '../components/DataTable';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { useTranslation } from '../i18n/useTranslation';
 import type { InventoryRow, AnalysisResult } from '../types/api';
 
 const CHART_NAMES = [
@@ -26,6 +27,7 @@ export default function StatsPage() {
   const [inventory, setInventory] = useState<InventoryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const latestBatchId = useAppStore((s) => s.latestBatchId);
+  const { t } = useTranslation();
 
   useEffect(() => {
     loadData();
@@ -53,8 +55,8 @@ export default function StatsPage() {
     }
   }
 
-  if (loading) return <LoadingSpinner text="Loading statistics..." />;
-  if (!batchId) return <div className="text-ci-gray text-center py-12">No data available. Run a pipeline first.</div>;
+  if (loading) return <LoadingSpinner text={t('stats.loading')} />;
+  if (!batchId) return <div className="text-ci-gray text-center py-12">{t('stats.noData')}</div>;
 
   // Build interactive chart data
   const numericCols = ['unit_cost', 'current_stock', 'daily_demand_est', 'safety_stock_target', 'lead_time_days', 'reorder_point', 'inventory_value'];
@@ -94,26 +96,26 @@ export default function StatsPage() {
   });
 
   const tabs = [
-    { key: 'interactive', label: 'Interactive' },
-    { key: 'png', label: 'PNG Charts' },
-    { key: 'data', label: 'Raw Data' },
-  ] as const;
+    { key: 'interactive' as const, label: t('stats.tabInteractive') },
+    { key: 'png' as const, label: t('stats.tabPNG') },
+    { key: 'data' as const, label: t('stats.tabData') },
+  ];
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold">Statistical Analysis</h2>
+      <h2 className="text-xl font-bold">{t('stats.title')}</h2>
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 w-fit">
-        {tabs.map((t) => (
+        {tabs.map((tabItem) => (
           <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
+            key={tabItem.key}
+            onClick={() => setTab(tabItem.key)}
             className={`px-4 py-1.5 text-sm rounded-md transition ${
-              tab === t.key ? 'bg-white dark:bg-ci-dark-card shadow font-medium' : 'text-ci-gray hover:text-ci-text'
+              tab === tabItem.key ? 'bg-white dark:bg-ci-dark-card shadow font-medium' : 'text-ci-gray hover:text-ci-text'
             }`}
           >
-            {t.label}
+            {tabItem.label}
           </button>
         ))}
       </div>
@@ -122,7 +124,7 @@ export default function StatsPage() {
         <div className="space-y-6">
           {/* Correlation Heatmap */}
           <div className="bg-white dark:bg-ci-dark-card rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-            <h3 className="text-sm font-medium mb-3">Correlation Heatmap</h3>
+            <h3 className="text-sm font-medium mb-3">{t('stats.correlationHeatmap')}</h3>
             <div className="overflow-auto">
               <table className="text-xs">
                 <thead>
@@ -161,7 +163,7 @@ export default function StatsPage() {
 
           {/* Distribution Histogram */}
           <div className="bg-white dark:bg-ci-dark-card rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-            <h3 className="text-sm font-medium mb-3">Unit Cost Distribution</h3>
+            <h3 className="text-sm font-medium mb-3">{t('stats.unitCostDist')}</h3>
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={histData}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -175,7 +177,7 @@ export default function StatsPage() {
 
           {/* Vendor Box Plot Approximation */}
           <div className="bg-white dark:bg-ci-dark-card rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-            <h3 className="text-sm font-medium mb-3">Vendor Inventory Value (Avg)</h3>
+            <h3 className="text-sm font-medium mb-3">{t('stats.vendorInventoryAvg')}</h3>
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={vendorBoxData}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -207,7 +209,7 @@ export default function StatsPage() {
       {tab === 'data' && (
         <DataTable
           data={inventory as unknown as Record<string, unknown>[]}
-          title="Inventory Snapshot"
+          title={t('stats.inventorySnapshot')}
           enableCSVDownload
           maxHeight="600px"
         />

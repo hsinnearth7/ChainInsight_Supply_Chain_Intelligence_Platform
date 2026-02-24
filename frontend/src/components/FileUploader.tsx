@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { useTranslation } from '../i18n/useTranslation';
 
 interface FileUploaderProps {
   onFileSelected: (file: File) => void;
@@ -8,6 +9,7 @@ interface FileUploaderProps {
 export default function FileUploader({ onFileSelected, disabled = false }: FileUploaderProps) {
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { t } = useTranslation();
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -49,8 +51,8 @@ export default function FileUploader({ onFileSelected, disabled = false }: FileU
         disabled={disabled}
       />
       <div className="text-4xl mb-3">📁</div>
-      <p className="text-sm font-medium">Drag & drop a CSV file here</p>
-      <p className="text-xs text-ci-gray mt-1">or click to browse</p>
+      <p className="text-sm font-medium">{t('upload.dragDrop')}</p>
+      <p className="text-xs text-ci-gray mt-1">{t('upload.browse')}</p>
     </div>
   );
 }

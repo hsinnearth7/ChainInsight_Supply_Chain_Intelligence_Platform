@@ -6,6 +6,7 @@ import KPICard from '../components/KPICard';
 import ChartImage from '../components/ChartImage';
 import DataTable from '../components/DataTable';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { useTranslation } from '../i18n/useTranslation';
 import type { AnalysisResult } from '../types/api';
 
 const RL_CHARTS = [
@@ -25,6 +26,7 @@ export default function RLPage() {
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(true);
   const latestBatchId = useAppStore((s) => s.latestBatchId);
+  const { t } = useTranslation();
 
   useEffect(() => {
     loadData();
@@ -48,8 +50,8 @@ export default function RLPage() {
     }
   }
 
-  if (loading) return <LoadingSpinner text="Loading RL results..." />;
-  if (!batchId) return <div className="text-ci-gray text-center py-12">No data available.</div>;
+  if (loading) return <LoadingSpinner text={t('rl.loading')} />;
+  if (!batchId) return <div className="text-ci-gray text-center py-12">{t('rl.noData')}</div>;
 
   const rlData = (analysis?.kpis || {}) as Record<string, unknown>;
   const comparisonData = rlData.comparison_data as Record<string, unknown> | undefined;
@@ -60,7 +62,6 @@ export default function RLPage() {
   // Build interactive reward curves from comparison_data
   const rewardCurveData: Record<string, number>[] = [];
   if (comparisonData) {
-    // comparison_data has agent_name -> { reward_history: number[], ... }
     const agents = Object.entries(comparisonData);
     const maxLen = Math.max(...agents.map(([, data]) => {
       const rh = (data as Record<string, unknown>).reward_history as number[] | undefined;
@@ -72,7 +73,6 @@ export default function RLPage() {
       for (const [name, data] of agents) {
         const rh = (data as Record<string, unknown>).reward_history as number[] | undefined;
         if (rh && ep < rh.length) {
-          // Smooth with running average (window of 10)
           const start = Math.max(0, ep - 9);
           const slice = rh.slice(start, ep + 1);
           point[name] = slice.reduce((a, b) => a + b, 0) / slice.length;
@@ -102,27 +102,27 @@ export default function RLPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold">RL Optimization</h2>
+      <h2 className="text-xl font-bold">{t('rl.title')}</h2>
 
       {/* Best Agent KPIs */}
       {bestAgent && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <KPICard title="Best Agent" value={String(bestAgent.name || '—')} icon="🏆" color="ci-primary" />
-          <KPICard title="Final Reward" value={typeof bestAgent.final_reward === 'number' ? bestAgent.final_reward.toFixed(2) : '—'} icon="💰" color="ci-success" />
-          <KPICard title="Service Level" value={typeof bestAgent.service_level === 'number' ? `${(bestAgent.service_level as number * 100).toFixed(1)}%` : '—'} icon="📊" color="ci-teal" />
-          <KPICard title="Agents Trained" value={agentKeys.length || '6'} icon="🤖" color="ci-purple" />
+          <KPICard title={t('rl.bestAgent')} value={String(bestAgent.name || '—')} icon="🏆" color="ci-primary" />
+          <KPICard title={t('rl.finalReward')} value={typeof bestAgent.final_reward === 'number' ? bestAgent.final_reward.toFixed(2) : '—'} icon="💰" color="ci-success" />
+          <KPICard title={t('rl.serviceLevel')} value={typeof bestAgent.service_level === 'number' ? `${(bestAgent.service_level as number * 100).toFixed(1)}%` : '—'} icon="📊" color="ci-teal" />
+          <KPICard title={t('rl.agentsTrained')} value={agentKeys.length || '6'} icon="🤖" color="ci-purple" />
         </div>
       )}
 
       {/* Agent Comparison Table */}
       {agentTableData.length > 0 && (
-        <DataTable data={agentTableData} title="Agent Comparison" columns={['agent', 'final_reward', 'avg_reward', 'best_reward', 'service_level', 'episodes']} />
+        <DataTable data={agentTableData} title={t('rl.agentComparison')} columns={['agent', 'final_reward', 'avg_reward', 'best_reward', 'service_level', 'episodes']} />
       )}
 
       {/* Interactive Reward Curves */}
       {rewardCurveData.length > 0 && (
         <div className="bg-white dark:bg-ci-dark-card rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-          <h3 className="text-sm font-medium mb-3">Reward Learning Curves (Interactive)</h3>
+          <h3 className="text-sm font-medium mb-3">{t('rl.rewardCurves')}</h3>
           <ResponsiveContainer width="100%" height={350}>
             <LineChart data={rewardCurveData}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -148,15 +148,15 @@ export default function RLPage() {
       {/* Environment Specs */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-white dark:bg-ci-dark-card rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-          <h3 className="text-sm font-medium mb-2">Environment Specification</h3>
+          <h3 className="text-sm font-medium mb-2">{t('rl.envSpec')}</h3>
           <table className="text-sm w-full">
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {[
-                ['State Space', '5-dim (stock, pending, days_since, demand_trend, stockout_days)'],
-                ['Action Space', '5 discrete (0x, 0.5x, 1x, 1.5x, 2x EOQ)'],
-                ['Episodes', '300'],
-                ['Steps/Episode', '90'],
-                ['Reward', '-(holding + stockout + ordering cost)'],
+                [t('rl.stateSpace'), '5-dim (stock, pending, days_since, demand_trend, stockout_days)'],
+                [t('rl.actionSpace'), '5 discrete (0x, 0.5x, 1x, 1.5x, 2x EOQ)'],
+                [t('rl.episodes'), '300'],
+                [t('rl.stepsPerEpisode'), '90'],
+                [t('rl.reward'), '-(holding + stockout + ordering cost)'],
               ].map(([key, val]) => (
                 <tr key={key}>
                   <td className="py-1 font-medium text-ci-gray">{key}</td>
@@ -167,7 +167,7 @@ export default function RLPage() {
           </table>
         </div>
         <div className="bg-white dark:bg-ci-dark-card rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-          <h3 className="text-sm font-medium mb-2">Agents</h3>
+          <h3 className="text-sm font-medium mb-2">{t('rl.agents')}</h3>
           <table className="text-sm w-full">
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {AGENT_NAMES.map((name, i) => (
@@ -187,7 +187,7 @@ export default function RLPage() {
       </div>
 
       {/* PNG Charts */}
-      <h3 className="text-sm font-medium">Pipeline Charts</h3>
+      <h3 className="text-sm font-medium">{t('rl.pipelineCharts')}</h3>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {RL_CHARTS.map((chart) => (
           <div key={chart.file}>

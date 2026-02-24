@@ -136,6 +136,14 @@ Watchdog ──▸ data/raw/ ──▸ auto-trigger       ├── on_progress 
 | `/rl` | RLPage | Agent KPIs, comparison table, interactive reward curves, PNG charts 23-28 |
 | `/history` | HistoryPage | Run table with status, KPI trend chart |
 
+### i18n (Internationalization)
+
+- **Languages**: English (en), Chinese (zh), Japanese (ja)
+- **Translation file**: `frontend/src/i18n/translations.ts` — all UI strings as `{ en, zh, ja }` objects
+- **Hook**: `frontend/src/i18n/useTranslation.ts` — `useTranslation()` returns `{ t, language }`
+- **State**: Zustand `appStore.language` with `localStorage` persistence (`ci-lang` key)
+- **Switcher**: Header component — 3-button toggle (EN / 中文 / 日本語)
+
 ### Database Tables
 
 - `inventory_snapshots` — one row per product per batch (time-series ready)
@@ -169,7 +177,7 @@ Watchdog ──▸ data/raw/ ──▸ auto-trigger       ├── on_progress 
 | `app/ws/manager.py` | WebSocket ConnectionManager |
 | `app/ws/routes.py` | WebSocket route handlers |
 | `app/watcher.py` | Watchdog file monitor |
-| `frontend/` | React SPA (Vite + TypeScript + Tailwind + Recharts + Zustand) |
+| `frontend/` | React SPA (Vite + TypeScript + Tailwind + Recharts + Zustand + i18n) |
 
 ## ETL Pipeline
 

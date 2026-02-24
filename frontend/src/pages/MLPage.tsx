@@ -4,6 +4,7 @@ import { useAppStore } from '../stores/appStore';
 import ChartImage from '../components/ChartImage';
 import DataTable from '../components/DataTable';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { useTranslation } from '../i18n/useTranslation';
 import type { AnalysisResult } from '../types/api';
 
 const ML_CHARTS = [
@@ -30,6 +31,7 @@ export default function MLPage() {
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(true);
   const latestBatchId = useAppStore((s) => s.latestBatchId);
+  const { t } = useTranslation();
 
   useEffect(() => {
     loadData();
@@ -53,8 +55,8 @@ export default function MLPage() {
     }
   }
 
-  if (loading) return <LoadingSpinner text="Loading ML results..." />;
-  if (!batchId) return <div className="text-ci-gray text-center py-12">No data available.</div>;
+  if (loading) return <LoadingSpinner text={t('ml.loading')} />;
+  if (!batchId) return <div className="text-ci-gray text-center py-12">{t('ml.noData')}</div>;
 
   // Parse ML results for algorithm table
   const mlResults = analysis?.kpis as Record<string, unknown> || {};
@@ -94,20 +96,20 @@ export default function MLPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold">ML / AI Analysis</h2>
+      <h2 className="text-xl font-bold">{t('ml.title')}</h2>
 
       {/* Algorithm Summary Table */}
       {algorithms.length > 0 && (
         <div className="bg-white dark:bg-ci-dark-card rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-          <h3 className="text-sm font-medium mb-3">Algorithm Summary ({algorithms.length} models)</h3>
+          <h3 className="text-sm font-medium mb-3">{t('ml.algorithmSummary')} ({algorithms.length} {t('ml.models')})</h3>
           <div className="overflow-auto max-h-[400px]">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">
                 <tr>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-ci-gray">Algorithm</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-ci-gray">Category</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-ci-gray">Status</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-ci-gray">Metric</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-ci-gray">{t('ml.algorithm')}</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-ci-gray">{t('ml.category')}</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-ci-gray">{t('ml.status')}</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-ci-gray">{t('ml.metric')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -130,7 +132,7 @@ export default function MLPage() {
       )}
 
       {/* PNG Charts */}
-      <h3 className="text-sm font-medium">Analysis Charts</h3>
+      <h3 className="text-sm font-medium">{t('ml.analysisCharts')}</h3>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {ML_CHARTS.map((chart) => (
           <div key={chart.file}>

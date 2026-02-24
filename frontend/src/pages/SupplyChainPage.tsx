@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { useAppStore } from '../stores/appStore';
 import ChartImage from '../components/ChartImage';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { useTranslation } from '../i18n/useTranslation';
 import type { InventoryRow } from '../types/api';
 
 const SC_CHARTS = [
@@ -24,6 +25,7 @@ export default function SupplyChainPage() {
   const [inventory, setInventory] = useState<InventoryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const latestBatchId = useAppStore((s) => s.latestBatchId);
+  const { t } = useTranslation();
 
   // EOQ calculator state
   const [eoqDemand, setEoqDemand] = useState(1000);
@@ -103,79 +105,79 @@ export default function SupplyChainPage() {
     setMcResult({ bins, stockoutPct: (stockouts.length / mcSims) * 100 });
   }
 
-  if (loading) return <LoadingSpinner text="Loading supply chain data..." />;
-  if (!batchId) return <div className="text-ci-gray text-center py-12">No data available.</div>;
+  if (loading) return <LoadingSpinner text={t('sc.loading')} />;
+  if (!batchId) return <div className="text-ci-gray text-center py-12">{t('sc.noData')}</div>;
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold">Supply Chain Optimization</h2>
+      <h2 className="text-xl font-bold">{t('sc.title')}</h2>
 
       {/* EOQ Calculator */}
       <div className="bg-white dark:bg-ci-dark-card rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-        <h3 className="text-sm font-medium mb-3">EOQ Calculator</h3>
+        <h3 className="text-sm font-medium mb-3">{t('sc.eoqCalc')}</h3>
         <div className="grid grid-cols-3 gap-4 mb-4">
           <label className="text-xs">
-            <span className="text-ci-gray">Annual Demand</span>
+            <span className="text-ci-gray">{t('sc.annualDemand')}</span>
             <input type="number" value={eoqDemand} onChange={(e) => setEoqDemand(+e.target.value)} className="mt-1 w-full px-2 py-1 border rounded text-sm dark:bg-gray-800 dark:border-gray-600" />
           </label>
           <label className="text-xs">
-            <span className="text-ci-gray">Order Cost ($)</span>
+            <span className="text-ci-gray">{t('sc.orderCost')}</span>
             <input type="number" value={eoqOrderCost} onChange={(e) => setEoqOrderCost(+e.target.value)} className="mt-1 w-full px-2 py-1 border rounded text-sm dark:bg-gray-800 dark:border-gray-600" />
           </label>
           <label className="text-xs">
-            <span className="text-ci-gray">Holding Cost ($/unit/yr)</span>
+            <span className="text-ci-gray">{t('sc.holdingCost')}</span>
             <input type="number" value={eoqHoldCost} onChange={(e) => setEoqHoldCost(+e.target.value)} className="mt-1 w-full px-2 py-1 border rounded text-sm dark:bg-gray-800 dark:border-gray-600" />
           </label>
         </div>
         <p className="text-sm mb-3">
-          Optimal Order Quantity: <span className="font-bold text-ci-primary">{eoq.optimalQ} units</span>
+          {t('sc.optimalQty')}: <span className="font-bold text-ci-primary">{eoq.optimalQ} {t('sc.units')}</span>
         </p>
-        <ResponsiveContainer width="100%" height={250}>
-          <LineChart data={eoq.points}>
+        <ResponsiveContainer width="100%" height={280}>
+          <LineChart data={eoq.points} margin={{ bottom: 20 }}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="qty" label={{ value: 'Order Quantity', position: 'bottom' }} tick={{ fontSize: 11 }} />
+            <XAxis dataKey="qty" label={{ value: t('common.orderQuantity'), position: 'insideBottom', offset: -10 }} tick={{ fontSize: 11 }} />
             <YAxis tickFormatter={(v) => `$${v}`} />
             <Tooltip formatter={(v: number) => `$${v}`} />
-            <Legend />
-            <Line type="monotone" dataKey="holding" stroke="#F39C12" name="Holding Cost" dot={false} />
-            <Line type="monotone" dataKey="ordering" stroke="#2E86C1" name="Ordering Cost" dot={false} />
-            <Line type="monotone" dataKey="total" stroke="#E74C3C" name="Total Cost" strokeWidth={2} dot={false} />
+            <Legend verticalAlign="top" align="left" wrapperStyle={{ paddingBottom: 8 }} />
+            <Line type="monotone" dataKey="holding" stroke="#F39C12" name={t('sc.holdingCostLabel')} dot={false} />
+            <Line type="monotone" dataKey="ordering" stroke="#2E86C1" name={t('sc.orderingCostLabel')} dot={false} />
+            <Line type="monotone" dataKey="total" stroke="#E74C3C" name={t('sc.totalCostLabel')} strokeWidth={2} dot={false} />
           </LineChart>
         </ResponsiveContainer>
       </div>
 
       {/* Monte Carlo Simulator */}
       <div className="bg-white dark:bg-ci-dark-card rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-        <h3 className="text-sm font-medium mb-3">Monte Carlo Stockout Simulation</h3>
+        <h3 className="text-sm font-medium mb-3">{t('sc.monteCarlo')}</h3>
         <div className="grid grid-cols-5 gap-3 mb-3">
           <label className="text-xs">
-            <span className="text-ci-gray">Simulations</span>
+            <span className="text-ci-gray">{t('sc.simulations')}</span>
             <input type="number" value={mcSims} onChange={(e) => setMcSims(+e.target.value)} className="mt-1 w-full px-2 py-1 border rounded text-sm dark:bg-gray-800 dark:border-gray-600" />
           </label>
           <label className="text-xs">
-            <span className="text-ci-gray">Daily Demand (mean)</span>
+            <span className="text-ci-gray">{t('sc.dailyDemandMean')}</span>
             <input type="number" value={mcDemandMean} onChange={(e) => setMcDemandMean(+e.target.value)} className="mt-1 w-full px-2 py-1 border rounded text-sm dark:bg-gray-800 dark:border-gray-600" />
           </label>
           <label className="text-xs">
-            <span className="text-ci-gray">Demand Std Dev</span>
+            <span className="text-ci-gray">{t('sc.demandStdDev')}</span>
             <input type="number" value={mcDemandStd} onChange={(e) => setMcDemandStd(+e.target.value)} className="mt-1 w-full px-2 py-1 border rounded text-sm dark:bg-gray-800 dark:border-gray-600" />
           </label>
           <label className="text-xs">
-            <span className="text-ci-gray">Lead Time (days)</span>
+            <span className="text-ci-gray">{t('sc.leadTimeDays')}</span>
             <input type="number" value={mcLeadTime} onChange={(e) => setMcLeadTime(+e.target.value)} className="mt-1 w-full px-2 py-1 border rounded text-sm dark:bg-gray-800 dark:border-gray-600" />
           </label>
           <label className="text-xs">
-            <span className="text-ci-gray">Current Stock</span>
+            <span className="text-ci-gray">{t('sc.currentStock')}</span>
             <input type="number" value={mcStock} onChange={(e) => setMcStock(+e.target.value)} className="mt-1 w-full px-2 py-1 border rounded text-sm dark:bg-gray-800 dark:border-gray-600" />
           </label>
         </div>
         <button onClick={runMonteCarlo} className="px-4 py-1.5 bg-ci-primary text-white text-sm rounded hover:bg-ci-primary/90 transition mb-3">
-          Run Simulation
+          {t('sc.runSimulation')}
         </button>
         {mcResult && (
           <>
             <p className="text-sm mb-2">
-              Stockout Probability: <span className={`font-bold ${mcResult.stockoutPct > 10 ? 'text-ci-danger' : 'text-ci-success'}`}>
+              {t('sc.stockoutProb')}: <span className={`font-bold ${mcResult.stockoutPct > 10 ? 'text-ci-danger' : 'text-ci-success'}`}>
                 {mcResult.stockoutPct.toFixed(1)}%
               </span>
             </p>
@@ -193,7 +195,7 @@ export default function SupplyChainPage() {
       </div>
 
       {/* PNG Charts */}
-      <h3 className="text-sm font-medium">Pipeline Charts</h3>
+      <h3 className="text-sm font-medium">{t('sc.pipelineCharts')}</h3>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {SC_CHARTS.map((chart) => (
           <div key={chart.file}>

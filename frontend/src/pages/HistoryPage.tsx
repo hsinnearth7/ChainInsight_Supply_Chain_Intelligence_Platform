@@ -3,6 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { api } from '../api/client';
 import { useAppStore } from '../stores/appStore';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { useTranslation } from '../i18n/useTranslation';
 import type { PipelineRun, KPIData } from '../types/api';
 
 const STATUS_STYLES: Record<string, string> = {
@@ -18,6 +19,7 @@ export default function HistoryPage() {
   const [kpiHistory, setKpiHistory] = useState<KPIData[]>([]);
   const [loading, setLoading] = useState(true);
   const setLatestBatchId = useAppStore((s) => s.setLatestBatchId);
+  const { t } = useTranslation();
 
   useEffect(() => {
     loadData();
@@ -41,7 +43,7 @@ export default function HistoryPage() {
     }
   }
 
-  if (loading) return <LoadingSpinner text="Loading history..." />;
+  if (loading) return <LoadingSpinner text={t('history.loading')} />;
 
   // Prepare KPI trend data
   const trendData = kpiHistory
@@ -60,12 +62,12 @@ export default function HistoryPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold">Pipeline History</h2>
+      <h2 className="text-xl font-bold">{t('history.title')}</h2>
 
       {/* KPI Trend Chart */}
       {trendData.length > 1 && (
         <div className="bg-white dark:bg-ci-dark-card rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-          <h3 className="text-sm font-medium mb-3">KPI Trends</h3>
+          <h3 className="text-sm font-medium mb-3">{t('history.kpiTrends')}</h3>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={trendData}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -86,18 +88,18 @@ export default function HistoryPage() {
       {/* Runs Table */}
       <div className="bg-white dark:bg-ci-dark-card rounded-lg border border-gray-200 dark:border-gray-700">
         <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-sm font-medium">Pipeline Runs ({runs.length})</h3>
+          <h3 className="text-sm font-medium">{t('history.pipelineRuns')} ({runs.length})</h3>
         </div>
         <div className="overflow-auto max-h-[500px]">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">
               <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-ci-gray">Batch ID</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-ci-gray">Status</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-ci-gray">Source File</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-ci-gray">Started</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-ci-gray">Completed</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-ci-gray">Duration</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-ci-gray">{t('history.batchId')}</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-ci-gray">{t('history.status')}</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-ci-gray">{t('history.sourceFile')}</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-ci-gray">{t('history.started')}</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-ci-gray">{t('history.completed')}</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-ci-gray">{t('history.duration')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -126,7 +128,7 @@ export default function HistoryPage() {
               {runs.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-ci-gray">
-                    No pipeline runs yet.
+                    {t('history.noRuns')}
                   </td>
                 </tr>
               )}

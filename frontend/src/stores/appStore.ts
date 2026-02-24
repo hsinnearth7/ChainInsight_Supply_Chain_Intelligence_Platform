@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { Language } from '../i18n/translations';
 
 interface WatchdogEvent {
   batch_id: string;
@@ -9,6 +10,9 @@ interface WatchdogEvent {
 interface AppState {
   darkMode: boolean;
   toggleDarkMode: () => void;
+
+  language: Language;
+  setLanguage: (lang: Language) => void;
 
   latestBatchId: string | null;
   setLatestBatchId: (id: string) => void;
@@ -33,6 +37,12 @@ export const useAppStore = create<AppState>((set) => ({
       }
       return { darkMode: next };
     }),
+
+  language: (localStorage.getItem('ci-lang') as Language) || 'en',
+  setLanguage: (lang) => {
+    localStorage.setItem('ci-lang', lang);
+    set({ language: lang });
+  },
 
   latestBatchId: null,
   setLatestBatchId: (id) => set({ latestBatchId: id }),

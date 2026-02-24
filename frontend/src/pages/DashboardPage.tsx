@@ -5,6 +5,7 @@ import { useAppStore } from '../stores/appStore';
 import KPICard from '../components/KPICard';
 import DataTable from '../components/DataTable';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { useTranslation } from '../i18n/useTranslation';
 import type { InventoryRow, KPIData } from '../types/api';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -21,6 +22,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const setLatestBatchId = useAppStore((s) => s.setLatestBatchId);
+  const { t } = useTranslation();
 
   useEffect(() => {
     loadData();
@@ -40,9 +42,9 @@ export default function DashboardPage() {
     }
   }
 
-  if (loading) return <LoadingSpinner text="Loading dashboard..." />;
+  if (loading) return <LoadingSpinner text={t('dashboard.loading')} />;
   if (error) return <div className="text-ci-danger text-center py-12">{error}</div>;
-  if (!kpiData) return <div className="text-ci-gray text-center py-12">No completed pipeline runs yet. Go to Upload & Run to start.</div>;
+  if (!kpiData) return <div className="text-ci-gray text-center py-12">{t('dashboard.noData')}</div>;
 
   const kpis = kpiData.kpis as Record<string, number>;
 
@@ -95,22 +97,22 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold">Dashboard</h2>
+      <h2 className="text-xl font-bold">{t('dashboard.title')}</h2>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        <KPICard title="Inventory Turnover" value={kpis.inventory_turnover?.toFixed(2) ?? '—'} icon="🔄" color="ci-primary" />
-        <KPICard title="Avg DSI" value={kpis.avg_dsi?.toFixed(1) ?? '—'} subtitle="Days" icon="📅" color="ci-teal" />
-        <KPICard title="OOS Rate" value={kpis.oos_rate != null ? `${(kpis.oos_rate as number).toFixed(1)}%` : '—'} icon="⚠️" color="ci-danger" />
-        <KPICard title="Slow-Moving Value" value={kpis.slow_moving_value != null ? `$${Math.round(kpis.slow_moving_value as number).toLocaleString()}` : '—'} icon="🐌" color="ci-warning" />
-        <KPICard title="Total Value" value={kpis.total_inventory_value != null ? `$${Math.round(kpis.total_inventory_value as number).toLocaleString()}` : '—'} icon="💰" color="ci-success" />
+        <KPICard title={t('dashboard.inventoryTurnover')} value={kpis.inventory_turnover?.toFixed(2) ?? '—'} icon="🔄" color="ci-primary" />
+        <KPICard title={t('dashboard.avgDSI')} value={kpis.avg_dsi?.toFixed(1) ?? '—'} subtitle={t('dashboard.days')} icon="📅" color="ci-teal" />
+        <KPICard title={t('dashboard.oosRate')} value={kpis.oos_rate != null ? `${(kpis.oos_rate as number).toFixed(1)}%` : '—'} icon="⚠️" color="ci-danger" />
+        <KPICard title={t('dashboard.slowMovingValue')} value={kpis.slow_moving_value != null ? `$${Math.round(kpis.slow_moving_value as number).toLocaleString()}` : '—'} icon="🐌" color="ci-warning" />
+        <KPICard title={t('dashboard.totalValue')} value={kpis.total_inventory_value != null ? `$${Math.round(kpis.total_inventory_value as number).toLocaleString()}` : '—'} icon="💰" color="ci-success" />
       </div>
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Stock Status Pie */}
         <div className="bg-white dark:bg-ci-dark-card rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-          <h3 className="text-sm font-medium mb-3">Stock Status Distribution</h3>
+          <h3 className="text-sm font-medium mb-3">{t('dashboard.stockStatus')}</h3>
           <ResponsiveContainer width="100%" height={280}>
             <PieChart>
               <Pie data={pieData} cx="50%" cy="50%" outerRadius={100} dataKey="value" label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}>
@@ -125,7 +127,7 @@ export default function DashboardPage() {
 
         {/* Category Inventory Bar */}
         <div className="bg-white dark:bg-ci-dark-card rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-          <h3 className="text-sm font-medium mb-3">Inventory Value by Category</h3>
+          <h3 className="text-sm font-medium mb-3">{t('dashboard.categoryValue')}</h3>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={barData} layout="vertical" margin={{ left: 80 }}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -144,8 +146,8 @@ export default function DashboardPage() {
 
       {/* Tables */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <DataTable data={vendorRows} title="Vendor Performance" columns={['vendor_name', 'products', 'total_value', 'oos_count', 'oos_rate']} />
-        <DataTable data={stockoutAlerts.slice(0, 20)} title="Stockout Alerts (DSI < Lead Time)" columns={['product_id', 'category', 'stock', 'dsi', 'lead_time', 'status']} />
+        <DataTable data={vendorRows} title={t('dashboard.vendorPerf')} columns={['vendor_name', 'products', 'total_value', 'oos_count', 'oos_rate']} />
+        <DataTable data={stockoutAlerts.slice(0, 20)} title={t('dashboard.stockoutAlerts')} columns={['product_id', 'category', 'stock', 'dsi', 'lead_time', 'status']} />
       </div>
     </div>
   );

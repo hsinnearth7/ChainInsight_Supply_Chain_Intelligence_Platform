@@ -8,12 +8,15 @@
 [![Pandas](https://img.shields.io/badge/pandas-1.5+-150458.svg)](https://pandas.pydata.org/)
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-1.0+-F7931E.svg)](https://scikit-learn.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Bilingual](https://img.shields.io/badge/lang-CN%20%7C%20EN-red.svg)](#bilingual-support)
+[![Trilingual](https://img.shields.io/badge/lang-EN%20%7C%20中文%20%7C%20日本語-red.svg)](#language-support)
+[![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688.svg)](https://fastapi.tiangolo.com/)
 
 <br>
 
 <img src="https://img.shields.io/badge/Data%20Pipeline-ETL-blue?style=for-the-badge" />
 <img src="https://img.shields.io/badge/Analysis-Statistical%20%2B%20ML-orange?style=for-the-badge" />
+<img src="https://img.shields.io/badge/RL%20Agents-6-red?style=for-the-badge" />
 <img src="https://img.shields.io/badge/Rows-10%2C000%2B-green?style=for-the-badge" />
 <img src="https://img.shields.io/badge/Algorithms-30-purple?style=for-the-badge" />
 
@@ -73,7 +76,11 @@ This project simulates a real-world supply chain scenario: a 10,000+ row invento
 - **Statistical Analysis Suite** — Pearson/Spearman correlation, Chi-square independence tests, ANOVA/Kruskal-Wallis group comparisons, outlier detection, and supply risk scoring
 - **Advanced Optimization** — EOQ (Economic Order Quantity) modeling, Monte Carlo stockout simulation, and inventory cost optimization
 - **30 ML Algorithms** — Classification, regression, clustering, dimensionality reduction, anomaly detection, and genetic algorithm optimization applied to supply chain data
-- **23 Publication-Ready Charts** — Comprehensive matplotlib/seaborn visualizations covering every analysis phase
+- **28 Publication-Ready Charts** — Comprehensive matplotlib/seaborn visualizations covering every analysis phase
+- **6 Reinforcement Learning Agents** — Q-Learning, SARSA, DQN, PPO, A2C, GA-RL Hybrid for dynamic inventory control
+- **React SPA + WebSocket Real-Time** — Modern React 18 + TypeScript frontend with live pipeline progress via WebSocket
+- **Trilingual UI (EN / 中文 / 日本語)** — Full i18n language switching with `localStorage` persistence
+- **Watchdog Auto-Trigger** — File monitoring auto-detects CSV drops in `data/raw/` and triggers pipeline
 - **Bilingual Codebase** — Every script has both Chinese and English versions with identical functionality
 
 ---
@@ -105,19 +112,82 @@ python -m http.server 8080
 
 ---
 
+## React SPA (Phase 3)
+
+ChainInsight includes a modern **React 18 + TypeScript** single-page application with real-time pipeline monitoring.
+
+### Features
+
+- **7 Pages** — Dashboard, Upload & Run, Statistics, Supply Chain, ML/AI, RL Optimization, History
+- **WebSocket Real-Time** — Live pipeline progress updates via WebSocket (`/ws/pipeline/{batch_id}`)
+- **Interactive Charts** — Recharts-powered EOQ calculator, Monte Carlo simulator, reward learning curves, correlation heatmaps
+- **Trilingual i18n** — Toggle between **EN / 中文 / 日本語** with all UI labels fully translated; language persisted in `localStorage`
+- **Dark Mode** — One-click theme toggle with Tailwind CSS `class` strategy
+- **Watchdog Notifications** — Real-time alerts when CSV files are auto-detected in `data/raw/`
+- **28 PNG Charts + Interactive Charts** — Both server-generated static charts and client-side interactive visualizations
+
+### How to Launch
+
+```bash
+# Development mode (hot reload)
+cd frontend && npm install && npm run dev
+# Opens at http://localhost:5173 (proxies API to :8000)
+# In a separate terminal:
+uvicorn app.main:app --reload --port 8000
+
+# Production mode (single server)
+cd frontend && npm run build
+uvicorn app.main:app --port 8000
+# Serves both API and React UI at http://localhost:8000
+```
+
+### Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | React 18 + TypeScript |
+| Build | Vite 6 |
+| Styling | Tailwind CSS (dark mode) |
+| Charts | Recharts |
+| State | Zustand |
+| Routing | React Router v6 |
+| Real-Time | WebSocket (auto-reconnect) |
+| i18n | Custom hook with 3 languages |
+
+---
+
 ## Project Architecture
 
-```
-                    ┌─────────────────────────────────────────────────────────────┐
-                    │                   ChainInsight Pipeline                      │
-                    └─────────────────────────────────────────────────────────────┘
+### Live Mode (Phase 3)
 
+```
+Upload CSV ──▸ FastAPI /api/ingest ──▸ PipelineOrchestrator (async)
+  (or)                                        │
+Watchdog ──▸ data/raw/ ──▸ auto-trigger       ├── on_progress callback
+                                               │         │
+                    ┌──────────────────────────┤         ▼
+                    ▼                          ▼    WebSocket broadcast
+              ETL Pipeline          SQLite DB       /ws/pipeline/{batch_id}
+                    │                                    │
+              ▼     ▼     ▼     ▼                       │
+           Stats  SCM   ML    RL                        │
+              │     │     │     │                        ▼
+              ▼     ▼     ▼     ▼              React SPA (real-time)
+         28 PNG charts + KPI JSON              7 pages, i18n (EN/ZH/JA)
+                    │
+              ▼           ▼
+        React SPA     REST API /api/*
+```
+
+### Batch Mode (Original)
+
+```
   ┌──────────────┐     ┌───────────────┐     ┌──────────────┐     ┌──────────────┐
   │   GENERATE   │────>│   CLEAN/ETL   │────>│   ANALYZE    │────>│  VISUALIZE   │
   │              │     │               │     │              │     │              │
-  │ generate_    │     │ clean_data.py │     │ Statistical  │     │ 23 Charts    │
+  │ generate_    │     │ clean_data.py │     │ Statistical  │     │ 28 Charts    │
   │ data.py      │     │ (8 Steps)     │     │ ML (30 algo) │     │ (matplotlib) │
-  │              │     │               │     │ Optimization │     │              │
+  │              │     │               │     │ RL (6 agents)│     │              │
   │ 10,050 rows  │     │ 8 cols → 11   │     │ Monte Carlo  │     │ PNG outputs  │
   │ 8 columns    │     │ cols          │     │              │     │              │
   └──────────────┘     └───────────────┘     └──────────────┘     └──────────────┘
@@ -132,38 +202,58 @@ python -m http.server 8080
 ## Project Structure
 
 ```
-supply-chain-analysis/
+ChainInsight/
 │
 ├── README.md                                           # This file
+├── CLAUDE.md                                           # Claude Code project context
 ├── LICENSE                                             # MIT License
 ├── requirements.txt                                    # Python dependencies
-├── dashboard.html                                      # Interactive dashboard (i18n: EN/JA/ZH)
+├── dashboard.html                                      # Static HTML dashboard (i18n: EN/JA/ZH)
+│
+├── app/                                                # FastAPI backend (Live Mode)
+│   ├── main.py                                         # FastAPI app entry (WS, watchdog, SPA)
+│   ├── config.py                                       # Centralized settings
+│   ├── api/routes.py                                   # REST API endpoints (async ingest)
+│   ├── ws/manager.py                                   # WebSocket ConnectionManager
+│   ├── ws/routes.py                                    # WebSocket route handlers
+│   ├── watcher.py                                      # Watchdog file monitor (data/raw/)
+│   ├── db/models.py                                    # SQLAlchemy models
+│   ├── pipeline/                                       # Pipeline stages
+│   │   ├── orchestrator.py                             # Coordinates all 5 stages
+│   │   ├── etl.py                                      # 8-step ETL cleaning
+│   │   ├── stats.py                                    # Charts 0-8, statistical KPIs
+│   │   ├── supply_chain.py                             # Charts 9-14, EOQ/Monte Carlo
+│   │   └── ml_engine.py                                # Charts 15-22, 30 ML algorithms
+│   └── rl/                                             # Reinforcement learning
+│       ├── environment.py                              # Gymnasium InventoryEnv
+│       ├── trainer.py                                  # Trains all 6 agents
+│       ├── evaluator.py                                # Charts 23-28, agent comparison
+│       └── agents/                                     # Q-Learning, SARSA, DQN, PPO, A2C, GA-RL
+│
+├── frontend/                                           # React SPA (Phase 3)
+│   ├── package.json                                    # React 18, Recharts, Zustand, Tailwind
+│   ├── vite.config.ts                                  # Vite proxy (API, WS, charts)
+│   ├── tailwind.config.js                              # ChainInsight color palette + dark mode
+│   └── src/
+│       ├── App.tsx                                     # Router + global WS listener
+│       ├── api/client.ts                               # Fetch-based API client
+│       ├── i18n/                                       # Trilingual i18n (EN/ZH/JA)
+│       │   ├── translations.ts                         # All UI strings in 3 languages
+│       │   └── useTranslation.ts                       # Translation hook
+│       ├── stores/appStore.ts                          # Zustand (dark mode, language, batch ID)
+│       ├── hooks/                                      # useWebSocket, usePipelineProgress
+│       ├── components/                                 # Sidebar, Header, KPICard, DataTable, etc.
+│       └── pages/                                      # 7 page components
 │
 ├── generate_data.py                                    # Synthetic dirty data generator
-│
 ├── clean_data .py                                      # ETL pipeline (Chinese)
-├── clean_data_en.py.txt                                # ETL pipeline (English)
+├── chart_*_*.py.txt                                    # Analysis scripts (CN & EN versions)
 │
-├── chart_0_Inventory Health & Stockout Risk.py.txt     # Inventory health dashboard (CN)
-├── chart_0_Inventory Health & Stockout Risk.en.py.txt  # Inventory health dashboard (EN)
+├── data/                                               # Runtime data directory
+│   ├── raw/                                            # Watchdog-monitored CSV drop zone
+│   └── charts/{batch_id}/                              # Generated charts per batch
 │
-├── chart_01_to_08_statistical_analysis.py.txt          # Statistical analysis suite (CN)
-├── chart_01_to_08_statistical_analysis_en.py.txt       # Statistical analysis suite (EN)
-│
-├── chart_09_to_14_advanced_supply_chain.py.txt         # Advanced optimization (CN)
-├── chart_09_to_14_advanced_supply_chain_en.py.txt      # Advanced optimization (EN)
-│
-├── chart_15_to_22_ai_algorithms_analysis.py.txt        # 30 ML algorithms (CN)
-├── chart_15_to_22_ai_algorithms_analysis_en.py.txt     # 30 ML algorithms (EN)
-│
-├── Supply_Chain_Inventory_Dirty_10k.csv                # Raw input data (generated)
-├── Supply_Chain_Inventory_Clean.csv                    # Cleaned output data
-│
-├── chart_0_Inventory Health & Stockout Risk.png        # Inventory health dashboard
-├── chart_01_correlation_matrix.png                     # Correlation heatmap
-├── chart_02_distribution_analysis.png                  # Distribution + QQ plots
-├── ...                                                 # (23 charts total)
-└── chart_22_algorithm_overview.png                     # 30-algorithm suitability matrix
+└── chaininsight.db                                     # SQLite database
 ```
 
 ---
@@ -206,6 +296,7 @@ supply-chain-analysis/
 ### Prerequisites
 
 - Python 3.8 or higher
+- Node.js 18+ (for React frontend)
 - pip package manager
 
 ### Installation
@@ -215,11 +306,24 @@ supply-chain-analysis/
 git clone https://github.com/hsinnearth7/ChainInsight_Supply_Chain_Intelligence_Platform.git
 cd ChainInsight_Supply_Chain_Intelligence_Platform
 
-# Install dependencies
+# Install Python dependencies
 pip install -r requirements.txt
+
+# Install frontend dependencies & build
+cd frontend && npm install && npm run build && cd ..
 ```
 
-### Quick Start
+### Quick Start — Live Mode (Recommended)
+
+```bash
+# Start the server (serves both API and React UI)
+uvicorn app.main:app --port 8000
+
+# Open http://localhost:8000 in your browser
+# Upload a CSV or use the existing dirty data to run the full pipeline
+```
+
+### Quick Start — Batch Mode (Original Scripts)
 
 ```bash
 # Step 1: Generate synthetic dirty data (10,050 rows)
@@ -227,19 +331,12 @@ python generate_data.py
 
 # Step 2: Run ETL cleaning pipeline
 python "clean_data .py"          # Chinese version
-# python clean_data_en.py.txt    # English version
 
 # Step 3: Run analysis modules
 python "chart_0_Inventory Health & Stockout Risk.py.txt"
 python chart_01_to_08_statistical_analysis.py.txt
 python chart_09_to_14_advanced_supply_chain.py.txt
 python chart_15_to_22_ai_algorithms_analysis.py.txt
-```
-
-### Run Everything At Once
-
-```bash
-python generate_data.py && python "clean_data .py" && python "chart_0_Inventory Health & Stockout Risk.py.txt" && python chart_01_to_08_statistical_analysis.py.txt && python chart_09_to_14_advanced_supply_chain.py.txt && python chart_15_to_22_ai_algorithms_analysis.py.txt
 ```
 
 ---
@@ -479,7 +576,7 @@ Complete 30-algorithm suitability matrix with status (Applied / N/A), category, 
 
 ## Visualization Gallery
 
-The pipeline generates **23 publication-ready charts** across all analysis phases:
+The pipeline generates **28 publication-ready charts** across all analysis phases (charts 0-22 from statistical/ML analysis + charts 23-28 from RL optimization):
 
 ### Inventory Health Dashboard
 | Chart | File | Description |
@@ -520,6 +617,16 @@ The pipeline generates **23 publication-ready charts** across all analysis phase
 | `chart_21` | `chart_21_genetic_algorithm.png` | GA convergence, optimal safety stock multipliers, cost savings, gene evolution |
 | `chart_22` | `chart_22_algorithm_overview.png` | 30-algorithm suitability matrix with status and library reference |
 
+### Reinforcement Learning (chart_23 ~ chart_28)
+| Chart | File | Description |
+|-------|------|-------------|
+| `chart_23` | `chart_23_rl_reward_curves.png` | Reward learning curves for all 6 agents |
+| `chart_24` | `chart_24_rl_service_levels.png` | Service level improvement over training episodes |
+| `chart_25` | `chart_25_rl_comparison.png` | Multi-agent performance comparison |
+| `chart_26` | `chart_26_rl_convergence.png` | Convergence analysis across agents |
+| `chart_27` | `chart_27_rl_reward_distribution.png` | Final reward distribution by agent |
+| `chart_28` | `chart_28_rl_summary.png` | Summary comparison table of all agents |
+
 ---
 
 ## Business Insights & Findings
@@ -555,15 +662,16 @@ The pipeline generates **23 publication-ready charts** across all analysis phase
 ### Planned Enhancements
 
 - [ ] **Deep Learning Integration** — Implement LSTM/GRU networks via TensorFlow/Keras for time-series demand forecasting
-- [ ] **Reinforcement Learning** — Q-Learning / DQN for dynamic reorder policy optimization
+- [x] **Reinforcement Learning** — 6 RL agents (Q-Learning, SARSA, DQN, PPO, A2C, GA-RL Hybrid) for dynamic reorder policy optimization
 - [x] **Interactive Dashboard** — Vanilla HTML/JS dashboard with i18n (EN/JA/ZH), CSV-driven KPIs, and chart gallery (`dashboard.html`)
-- [ ] **Real-Time Dashboard** — Upgrade to Streamlit/Dash for live inventory monitoring with backend integration
-- [ ] **Database Backend** — Migrate from CSV to PostgreSQL/MongoDB for production-grade data storage
-- [ ] **API Service** — RESTful API (FastAPI) for serving predictions and KPIs to downstream systems
-- [ ] **Automated Alerting** — Threshold-based notifications for stockout risk and anomaly detection
+- [x] **React SPA + Real-Time** — React 18 + TypeScript frontend with WebSocket live pipeline progress, 7 pages, trilingual i18n
+- [x] **Database Backend** — SQLite via SQLAlchemy (InventorySnapshot, AnalysisResult, PipelineRun models)
+- [x] **API Service** — FastAPI REST API (11 endpoints) + WebSocket for real-time updates
+- [x] **Automated Alerting** — Watchdog file monitoring auto-triggers pipeline on CSV drop; stockout alerts on dashboard
 - [ ] **Multi-Warehouse Support** — Extend data model to support multi-location inventory optimization
 - [ ] **Supplier Lead Time Prediction** — ML model to predict actual lead times based on historical patterns
 - [ ] **Docker Containerization** — Reproducible deployment with Docker Compose
+- [ ] **PostgreSQL Migration** — Upgrade from SQLite to PostgreSQL for production scale
 
 ### Open Problems
 
@@ -582,16 +690,20 @@ The pipeline generates **23 publication-ready charts** across all analysis phase
 
 | Layer | Technologies |
 |-------|-------------|
-| **Language** | Python 3.8+ |
+| **Language** | Python 3.8+, TypeScript |
+| **Backend** | FastAPI, uvicorn, SQLAlchemy, SQLite |
+| **Frontend** | React 18, Vite 6, Tailwind CSS, Recharts, Zustand |
+| **Real-Time** | WebSocket (auto-reconnect) |
+| **i18n** | Custom React hook (EN / 中文 / 日本語) |
+| **File Monitoring** | watchdog (auto-trigger pipeline on CSV drop) |
 | **Data Processing** | pandas, numpy |
-| **String Parsing** | re (regex, stdlib) |
 | **Statistical Analysis** | scipy (chi2, ANOVA, Kruskal-Wallis, Shapiro-Wilk, correlation tests) |
 | **Machine Learning** | scikit-learn (classification, regression, clustering, anomaly detection) |
-| **Visualization** | matplotlib, seaborn, squarify (treemap) |
+| **Reinforcement Learning** | Gymnasium, PyTorch (Q-Learning, SARSA, DQN, PPO, A2C, GA-RL) |
+| **Visualization** | matplotlib, seaborn, squarify (treemap), Recharts (interactive) |
 | **Optional** | xgboost (if installed, used for XGBoost classifier) |
-| **Planned** | TensorFlow/Keras (deep learning), Streamlit (dashboard), FastAPI (API) |
 
-### Dependencies
+### Python Dependencies
 
 ```
 pandas>=1.5.0
@@ -601,11 +713,44 @@ scikit-learn>=1.0.0
 matplotlib>=3.5.0
 seaborn>=0.11.0
 squarify>=0.4.3
+fastapi>=0.100.0
+uvicorn>=0.22.0
+sqlalchemy>=2.0.0
+websockets>=11.0
+watchdog>=3.0.0
+gymnasium>=0.28.0
+torch>=2.0.0
+```
+
+### Frontend Dependencies
+
+```
+react, react-dom, react-router-dom
+recharts, zustand
+tailwindcss, autoprefixer, postcss
+vite, typescript
 ```
 
 ---
 
-## Bilingual Support
+## Language Support
+
+### React SPA — Trilingual i18n (EN / 中文 / 日本語)
+
+The React frontend supports **3 languages** with a one-click switcher in the header. All UI labels, page titles, form labels, chart titles, and status messages are fully translated. Language preference is persisted in `localStorage`.
+
+| Component | Translated Elements |
+|-----------|-------------------|
+| Sidebar | Navigation labels, subtitle |
+| Header | Subtitle, dark mode toggle |
+| Dashboard | KPI titles, chart titles, table headers |
+| Upload | Instructions, status messages |
+| Statistics | Tab labels, chart titles |
+| Supply Chain | EOQ labels, Monte Carlo labels |
+| ML / RL | Section titles, table headers |
+| History | Column headers, status labels |
+
+### Batch Scripts — Bilingual (Chinese + English)
 
 Every analysis script is provided in both **Chinese** and **English** with identical functionality:
 
@@ -631,12 +776,12 @@ Contributions are welcome! Here's how you can help:
 
 ### Areas Where Help Is Needed
 
-- Time-series demand forecasting with deep learning
-- Reinforcement learning environment for inventory control
-- Interactive dashboard development (Streamlit/Dash)
+- Time-series demand forecasting with deep learning (LSTM/Transformer)
+- PostgreSQL migration for production deployment
+- Docker containerization
 - Additional data quality issue generators
-- Unit test coverage
-- Documentation translations (Japanese, Korean, Spanish)
+- Unit test coverage (Python + React)
+- Documentation translations (Korean, Spanish)
 
 ---
 

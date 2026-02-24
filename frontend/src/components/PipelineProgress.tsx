@@ -1,11 +1,13 @@
 import type { StageStatus } from '../hooks/usePipelineProgress';
+import { useTranslation } from '../i18n/useTranslation';
+import type { TranslationKey } from '../i18n/translations';
 
-const STAGE_LABELS: Record<string, string> = {
-  etl: 'ETL Pipeline',
-  stats: 'Statistical Analysis',
-  supply_chain: 'Supply Chain',
-  ml: 'ML / AI Analysis',
-  rl: 'RL Optimization',
+const STAGE_LABEL_KEYS: Record<string, TranslationKey> = {
+  etl: 'stage.etl',
+  stats: 'stage.stats',
+  supply_chain: 'stage.supply_chain',
+  ml: 'stage.ml',
+  rl: 'stage.rl',
 };
 
 interface PipelineProgressProps {
@@ -16,13 +18,15 @@ interface PipelineProgressProps {
 }
 
 export default function PipelineProgress({ stages, overallPct, pipelineStatus, connected }: PipelineProgressProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="bg-white dark:bg-ci-dark-card rounded-lg border border-gray-200 dark:border-gray-700 p-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-medium">Pipeline Progress</h3>
+        <h3 className="text-sm font-medium">{t('pipeline.title')}</h3>
         <div className="flex items-center gap-2">
           <span className={`w-2 h-2 rounded-full ${connected ? 'bg-ci-success' : 'bg-ci-gray'}`} />
-          <span className="text-xs text-ci-gray">{connected ? 'Live' : 'Disconnected'}</span>
+          <span className="text-xs text-ci-gray">{connected ? t('pipeline.live') : t('pipeline.disconnected')}</span>
         </div>
       </div>
 
@@ -51,7 +55,7 @@ export default function PipelineProgress({ stages, overallPct, pipelineStatus, c
               {s.status === 'completed' ? '✅' : s.status === 'running' ? '⏳' : s.status === 'failed' ? '❌' : '⬜'}
             </span>
             <span className={`text-sm flex-1 ${s.status === 'running' ? 'font-medium text-ci-primary' : ''}`}>
-              {STAGE_LABELS[s.stage] || s.stage}
+              {STAGE_LABEL_KEYS[s.stage] ? t(STAGE_LABEL_KEYS[s.stage]) : s.stage}
             </span>
             <span className="text-xs text-ci-gray capitalize">{s.status}</span>
           </div>

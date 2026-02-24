@@ -5,6 +5,7 @@ import { usePipelineProgress } from '../hooks/usePipelineProgress';
 import FileUploader from '../components/FileUploader';
 import PipelineProgress from '../components/PipelineProgress';
 import KPICard from '../components/KPICard';
+import { useTranslation } from '../i18n/useTranslation';
 
 export default function UploadPage() {
   const [batchId, setBatchId] = useState<string | null>(null);
@@ -15,6 +16,7 @@ export default function UploadPage() {
   const setLatestBatchId = useAppStore((s) => s.setLatestBatchId);
   const setActivePipelineBatchId = useAppStore((s) => s.setActivePipelineBatchId);
   const { stages, overallPct, pipelineStatus, connected, reset } = usePipelineProgress(batchId);
+  const { t } = useTranslation();
 
   async function handleUpload(file: File) {
     setUploading(true);
@@ -69,7 +71,7 @@ export default function UploadPage() {
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
-      <h2 className="text-xl font-bold">Upload & Run Pipeline</h2>
+      <h2 className="text-xl font-bold">{t('upload.title')}</h2>
 
       <FileUploader onFileSelected={handleUpload} disabled={uploading || pipelineStatus === 'running'} />
 
@@ -79,7 +81,7 @@ export default function UploadPage() {
           disabled={uploading || pipelineStatus === 'running'}
           className="text-sm text-ci-primary hover:underline disabled:opacity-50"
         >
-          Use existing dirty_inventory_10000.csv
+          {t('upload.useExisting')}
         </button>
       </div>
 
@@ -98,7 +100,7 @@ export default function UploadPage() {
 
       {pipelineStatus === 'completed' && etlSummary && (
         <div className="space-y-3">
-          <h3 className="text-sm font-medium">ETL Summary</h3>
+          <h3 className="text-sm font-medium">{t('upload.etlSummary')}</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {Object.entries(etlSummary).map(([key, val]) => (
               <KPICard key={key} title={key.replace(/_/g, ' ')} value={typeof val === 'number' ? val.toLocaleString() : String(val ?? '—')} />
@@ -109,7 +111,7 @@ export default function UploadPage() {
 
       {pipelineStatus === 'completed' && (
         <div className="text-center text-ci-success text-sm font-medium">
-          Pipeline complete! Visit Dashboard to view results.
+          {t('upload.pipelineComplete')}
         </div>
       )}
     </div>
