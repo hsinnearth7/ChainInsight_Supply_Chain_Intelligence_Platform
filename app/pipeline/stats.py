@@ -427,37 +427,52 @@ class StatisticalAnalyzer:
     # ------------------------------------------------------------------
     def plot_cross_analysis(self, df: pd.DataFrame):
         save_path = self.output_dir / "chart_04_category_vendor_heatmap.png"
-        fig, axes = plt.subplots(2, 2, figsize=(22, 16), facecolor=CHART_BG_COLOR)
-        fig.suptitle("Category x Vendor Cross Analysis — Heatmaps with Chi-Square Test",
-                     fontsize=18, fontweight="bold", y=1.0, color=CHART_TEXT_COLOR)
+
+        # Shorten vendor names for better layout (e.g. "Tokyo Electronics" -> "Tokyo")
+        df = df.copy()
+        df["_Vendor_Short"] = df["Vendor_Name"].str.split().str[0]
+
         analyses = [
             ("Inventory_Value", "sum", "Total Inventory Value ($)", "YlOrRd"),
             ("Current_Stock", "mean", "Avg Stock Quantity", "Blues"),
             ("Lead_Time_Days", "mean", "Avg Lead Time (days)", "Purples"),
             ("Supply_Risk_Score", "mean", "Avg Supply Risk Score", "RdYlGn_r"),
         ]
+
+        fig, axes = plt.subplots(2, 2, figsize=(20, 16), facecolor=CHART_BG_COLOR)
+        fig.suptitle("Category × Vendor Cross Analysis — Heatmaps with Chi-Square Test",
+                     fontsize=16, fontweight="bold", color=CHART_TEXT_COLOR)
+
         for idx, (col, agg, title, cmap) in enumerate(analyses):
             ax = axes[idx // 2, idx % 2]
-            pivot = df.pivot_table(values=col, index="Category", columns="Vendor_Name",
+            ax.set_facecolor("white")
+            if col not in df.columns:
+                ax.set_title(f"{title} (N/A)", fontsize=12, fontweight="bold")
+                ax.text(0.5, 0.5, "Column not available", ha="center", va="center",
+                        transform=ax.transAxes, fontsize=11, color=CHART_TEXT_COLOR)
+                continue
+            pivot = df.pivot_table(values=col, index="Category", columns="_Vendor_Short",
                                    aggfunc=agg, fill_value=0)
-            pivot = pivot.loc[pivot.sum(axis=1).sort_values(ascending=False).index]
-            pivot = pivot[pivot.sum().sort_values(ascending=False).index]
             annot_fmt = ".0f" if "Value" in title or "Stock" in title else ".2f"
             sns.heatmap(pivot, annot=True, fmt=annot_fmt, cmap=cmap, linewidths=0.5,
-                        ax=ax, cbar_kws={"shrink": 0.7})
-            ax.set_title(title, fontsize=13, fontweight="bold", pad=10)
+                        ax=ax, cbar_kws={"shrink": 0.8},
+                        annot_kws={"fontsize": 8})
+            ax.set_title(title, fontsize=12, fontweight="bold", pad=8, color=CHART_TEXT_COLOR)
             ax.set_xlabel("")
             ax.set_ylabel("")
-            ax.tick_params(labelsize=8)
-            ax.set_xticklabels(ax.get_xticklabels(), rotation=30, ha="right")
+            ax.tick_params(labelsize=9, colors=CHART_TEXT_COLOR)
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right")
+            ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
+
         ct = pd.crosstab(df["Category"], df["Stock_Status"])
         chi2, chi_p, dof, _ = chi2_contingency(ct)
-        sig_text = "Significant (Not Independent)" if chi_p < 0.05 else "Not Significant (Independent)"
-        fig.text(0.5, -0.01, f"Chi-Square Test: chi2={chi2:.1f}, df={dof}, p={chi_p:.2e} -> {sig_text}",
+        sig_text = "Significant" if chi_p < 0.05 else "Not Significant"
+        fig.text(0.5, 0.01, f"Chi-Square: χ²={chi2:.1f}, df={dof}, p={chi_p:.2e} → {sig_text}",
                  ha="center", fontsize=10, color=CHART_TEXT_COLOR,
                  bbox=dict(boxstyle="round,pad=0.5", fc="#EBF5FB", ec="#2E86C1"))
         self.results["chi_square"] = {"chi2": chi2, "p": chi_p, "dof": dof}
-        plt.tight_layout()
+
+        plt.subplots_adjust(top=0.93, bottom=0.06, hspace=0.35, wspace=0.30)
         plt.savefig(save_path, dpi=CHART_DPI, bbox_inches="tight", facecolor=fig.get_facecolor())
         plt.close()
         self.chart_paths.append(save_path)
