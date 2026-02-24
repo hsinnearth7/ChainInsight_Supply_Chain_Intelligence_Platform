@@ -50,12 +50,16 @@ class PipelineOrchestrator:
         logger.info("Pipeline started — batch_id=%s, input=%s", batch_id, input_path)
 
         db = SessionLocal()
-        run_record = PipelineRun(
-            batch_id=batch_id,
-            status="running",
-            source_file=str(input_path),
-        )
-        db.add(run_record)
+        run_record = db.query(PipelineRun).filter(PipelineRun.batch_id == batch_id).first()
+        if run_record:
+            run_record.status = "running"
+        else:
+            run_record = PipelineRun(
+                batch_id=batch_id,
+                status="running",
+                source_file=str(input_path),
+            )
+            db.add(run_record)
         db.commit()
 
         all_results = {"batch_id": batch_id, "stages": {}}

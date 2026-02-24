@@ -9,12 +9,12 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import type { AnalysisResult } from '../types/api';
 
 const RL_CHARTS = [
-  { file: 'chart_23_reward_curves.png', label: 'Reward Learning Curves' },
-  { file: 'chart_24_service_level.png', label: 'Service Level Over Training' },
-  { file: 'chart_25_agent_comparison.png', label: 'Agent Comparison' },
-  { file: 'chart_26_convergence.png', label: 'Convergence Analysis' },
-  { file: 'chart_27_reward_distribution.png', label: 'Reward Distribution' },
-  { file: 'chart_28_summary_table.png', label: 'Summary Comparison Table' },
+  { file: 'chart_23_rl_reward_curves.png', label: 'Reward Learning Curves' },
+  { file: 'chart_24_rl_service_levels.png', label: 'Service Level Over Training' },
+  { file: 'chart_25_rl_comparison.png', label: 'Agent Comparison' },
+  { file: 'chart_26_rl_convergence.png', label: 'Convergence Analysis' },
+  { file: 'chart_27_rl_reward_distribution.png', label: 'Reward Distribution' },
+  { file: 'chart_28_rl_summary.png', label: 'Summary Comparison Table' },
 ];
 
 const AGENT_COLORS = ['#2E86C1', '#27AE60', '#E74C3C', '#F39C12', '#8E44AD', '#1ABC9C'];

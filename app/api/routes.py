@@ -33,7 +33,12 @@ def _make_ws_progress_callback(batch_id: str, loop: asyncio.AbstractEventLoop):
     stage_index = {s: i for i, s in enumerate(PipelineOrchestrator.STAGES)}
     total = len(PipelineOrchestrator.STAGES)
 
-    def callback(stage: str, status: str, data: dict):
+    def callback(stage: str, status: str, data: dict = None):
+        # RL trainer calls with 2 args (stage, message_string), normalize it
+        if data is None and isinstance(status, str) and status not in ("running", "completed", "failed"):
+            data = {"message": status}
+            status = "running"
+        data = data or {}
         idx = stage_index.get(stage, 0)
         if status == "completed":
             pct = int(((idx + 1) / total) * 100)

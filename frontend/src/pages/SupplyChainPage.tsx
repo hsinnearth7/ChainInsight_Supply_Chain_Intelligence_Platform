@@ -10,9 +10,9 @@ const SC_CHARTS = [
   { file: 'chart_09_eoq_analysis.png', label: 'EOQ Analysis' },
   { file: 'chart_10_vendor_radar.png', label: 'Vendor Radar Chart' },
   { file: 'chart_11_inventory_treemap.png', label: 'Inventory Treemap' },
-  { file: 'chart_12_monte_carlo.png', label: 'Monte Carlo Simulation' },
-  { file: 'chart_13_reorder_gap.png', label: 'Reorder Gap Waterfall' },
-  { file: 'chart_14_demand_safety.png', label: 'Demand vs Safety Stock' },
+  { file: 'chart_12_monte_carlo_stockout.png', label: 'Monte Carlo Simulation' },
+  { file: 'chart_13_reorder_gap_waterfall.png', label: 'Reorder Gap Waterfall' },
+  { file: 'chart_14_demand_safety_stock.png', label: 'Demand vs Safety Stock' },
 ];
 
 const ORDERING_COST = 50;

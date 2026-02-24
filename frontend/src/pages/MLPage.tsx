@@ -7,14 +7,14 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import type { AnalysisResult } from '../types/api';
 
 const ML_CHARTS = [
-  { file: 'chart_15_feature_importance.png', label: 'Feature Importance' },
-  { file: 'chart_16_classification_comparison.png', label: 'Classification Comparison' },
-  { file: 'chart_17_confusion_matrices.png', label: 'Confusion Matrices' },
-  { file: 'chart_18_roc_curves.png', label: 'ROC Curves' },
-  { file: 'chart_19_regression_comparison.png', label: 'Regression Comparison' },
-  { file: 'chart_20_clustering.png', label: 'Clustering Analysis' },
-  { file: 'chart_21_anomaly_detection.png', label: 'Anomaly Detection' },
-  { file: 'chart_22_ga_convergence.png', label: 'GA Convergence' },
+  { file: 'chart_15_classification_comparison.png', label: 'Classification Comparison' },
+  { file: 'chart_16_feature_importance.png', label: 'Feature Importance' },
+  { file: 'chart_17_regression_prediction.png', label: 'Regression Prediction' },
+  { file: 'chart_18_clustering_analysis.png', label: 'Clustering Analysis' },
+  { file: 'chart_19_pca_tsne.png', label: 'PCA / t-SNE' },
+  { file: 'chart_20_anomaly_detection.png', label: 'Anomaly Detection' },
+  { file: 'chart_21_genetic_algorithm.png', label: 'Genetic Algorithm' },
+  { file: 'chart_22_algorithm_overview.png', label: 'Algorithm Overview' },
 ];
 
 const STATUS_COLORS: Record<string, string> = {

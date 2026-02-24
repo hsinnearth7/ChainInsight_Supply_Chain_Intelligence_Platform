@@ -8,15 +8,15 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import type { InventoryRow, AnalysisResult } from '../types/api';
 
 const CHART_NAMES = [
-  { file: 'chart_00_inventory_health.png', label: 'Inventory Health Dashboard' },
-  { file: 'chart_01_correlation.png', label: 'Correlation Matrix' },
-  { file: 'chart_02_distribution.png', label: 'Distribution Analysis' },
+  { file: 'chart_0_inventory_health.png', label: 'Inventory Health Dashboard' },
+  { file: 'chart_01_correlation_matrix.png', label: 'Correlation Matrix' },
+  { file: 'chart_02_distribution_analysis.png', label: 'Distribution Analysis' },
   { file: 'chart_03_vendor_performance.png', label: 'Vendor Performance' },
   { file: 'chart_04_category_vendor_heatmap.png', label: 'Category-Vendor Heatmap' },
-  { file: 'chart_05_regression.png', label: 'Regression Analysis' },
-  { file: 'chart_06_category_risk.png', label: 'Category Risk Profile' },
-  { file: 'chart_07_outlier_risk.png', label: 'Outlier Risk Analysis' },
-  { file: 'chart_08_pairplot.png', label: 'Pairplot & Regression' },
+  { file: 'chart_05_regression_analysis.png', label: 'Regression Analysis' },
+  { file: 'chart_06_category_risk_profile.png', label: 'Category Risk Profile' },
+  { file: 'chart_07_outlier_risk_analysis.png', label: 'Outlier Risk Analysis' },
+  { file: 'chart_08_pairplot_regression.png', label: 'Pairplot & Regression' },
 ];
 
 export default function StatsPage() {
