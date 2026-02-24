@@ -111,6 +111,36 @@ async def ingest_csv(file: UploadFile = File(...)):
     return {"batch_id": batch_id, "status": "queued", "message": "Pipeline started. Connect to WS for real-time progress."}
 
 
+@router.post("/ingest/existing")
+async def ingest_existing():
+    """Trigger pipeline using an existing CSV file in data/raw/."""
+    # Find the dirty CSV file
+    candidates = list(RAW_DIR.glob("*Dirty*.csv")) + list(RAW_DIR.glob("*dirty*.csv"))
+    if not candidates:
+        raise HTTPException(404, "No existing dirty CSV found in data/raw/")
+    raw_path = candidates[0]
+    if raw_path.stat().st_size == 0:
+        raise HTTPException(400, f"File {raw_path.name} is empty (0 bytes)")
+    logger.info("Using existing file: %s", raw_path)
+
+    batch_id = f"batch_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
+    db = SessionLocal()
+    try:
+        run_record = PipelineRun(batch_id=batch_id, status="queued", source_file=str(raw_path))
+        db.add(run_record)
+        db.commit()
+    finally:
+        db.close()
+
+    loop = asyncio.get_running_loop()
+    progress_cb = _make_ws_progress_callback(batch_id, loop)
+    orchestrator = PipelineOrchestrator(on_progress=progress_cb)
+    asyncio.create_task(
+        asyncio.to_thread(orchestrator.run, str(raw_path), batch_id)
+    )
+    return {"batch_id": batch_id, "status": "queued", "message": "Pipeline started with existing file."}
+
+
 # ---------- Ingest from path (for watchdog) ----------
 
 async def trigger_pipeline_from_path(file_path: str):

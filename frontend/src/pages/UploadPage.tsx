@@ -43,16 +43,11 @@ export default function UploadPage() {
     reset();
 
     try {
-      // Upload the known dirty data file
-      const res = await fetch('/api/ingest', {
-        method: 'POST',
-        body: (() => {
-          const form = new FormData();
-          form.append('file', new Blob([''], { type: 'text/csv' }), 'dirty_inventory_10000.csv');
-          return form;
-        })(),
-      });
-      if (!res.ok) throw new Error(`Failed: ${res.status}`);
+      const res = await fetch('/api/ingest/existing', { method: 'POST' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Failed: ${res.status}`);
+      }
       const result = await res.json();
       setBatchId(result.batch_id);
       setLatestBatchId(result.batch_id);
