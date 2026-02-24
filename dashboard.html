@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChainInsight — Supply Chain Intelligence Dashboard</title>
+  <style>
+:root {
+  --bg-primary:#0a0e1a; --bg-secondary:#111827; --bg-card:#1a2235; --bg-card-hover:#1f2a40;
+  --border:#2a3555; --text-primary:#f1f5f9; --text-secondary:#94a3b8; --text-muted:#64748b;
+  --accent-blue:#3b82f6; --accent-cyan:#06b6d4; --accent-green:#10b981; --accent-yellow:#f59e0b;
+  --accent-orange:#f97316; --accent-red:#ef4444; --accent-purple:#8b5cf6;
+  --status-normal:#10b981; --status-low:#f59e0b; --status-oos:#ef4444;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg-primary);color:var(--text-primary);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:6px} ::-webkit-scrollbar-track{background:var(--bg-secondary)} ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.app{display:flex;height:100vh}
+
+/* Sidebar */
+.sidebar{width:260px;background:var(--bg-secondary);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+.sidebar-hd{padding:20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+.sidebar-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--accent-blue),var(--accent-cyan));border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:#fff}
+.sidebar-hd h1{font-size:18px;font-weight:700;background:linear-gradient(135deg,var(--accent-blue),var(--accent-cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sidebar-hd small{display:block;font-size:10px;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase}
+.sidebar-nav{flex:1;padding:12px;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
+.nav-btn{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--text-secondary);border:none;background:none;width:100%;text-align:left;font-family:inherit;transition:all .15s}
+.nav-btn:hover{background:var(--bg-card);color:var(--text-primary)}
+.nav-btn.active{background:rgba(59,130,246,.15);color:var(--accent-blue)}
+.sidebar-ft{padding:14px 16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:10px}
+
+/* Language Switcher */
+.lang-switch{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted)}
+.lang-bar{display:flex;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;flex:1}
+.lang-btn{flex:1;padding:5px 0;border:none;background:transparent;color:var(--text-muted);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit;text-align:center;border-right:1px solid var(--border)}
+.lang-btn:last-child{border-right:none}
+.lang-btn:hover{color:var(--text-primary);background:var(--bg-card)}
+.lang-btn.on{background:rgba(59,130,246,.2);color:var(--accent-blue)}
+.info-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted)}
+
+/* Main */
+.main{flex:1;overflow-y:auto;padding:24px}
+.main-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:10px}
+.main-hd h2{font-size:22px;font-weight:700}
+.hd-right{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-muted)}
+.tag-static{display:inline-flex;align-items:center;gap:6px;background:rgba(59,130,246,.15);color:var(--accent-blue);padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+
+/* Stats */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:22px}
+.stat{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;transition:all .15s}
+.stat:hover{border-color:var(--accent-blue);transform:translateY(-1px)}
+.stat-label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.stat-val{font-size:26px;font-weight:700}
+.stat-sub{font-size:11px;color:var(--text-muted);margin-top:4px}
+
+/* Grid */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:22px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:22px}
+@media(max-width:1100px){.grid2,.grid3{grid-template-columns:1fr}}
+
+/* Card */
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:18px}
+.card-hd{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border)}
+.card-hd h3{font-size:14px;font-weight:600}
+.card-badge{font-size:11px;padding:2px 8px;border-radius:12px;font-weight:600}
+.card-body{padding:18px}
+.empty{padding:40px;text-align:center;color:var(--text-muted);font-size:13px}
+
+/* Chart gallery */
+.chart-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:18px}
+.chart-item{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:all .2s}
+.chart-item:hover{border-color:var(--accent-blue);transform:translateY(-2px)}
+.chart-item img{width:100%;display:block;cursor:pointer;transition:opacity .2s}
+.chart-item img:hover{opacity:.9}
+.chart-item .chart-info{padding:12px 16px}
+.chart-item .chart-title{font-size:13px;font-weight:600;margin-bottom:4px}
+.chart-item .chart-desc{font-size:12px;color:var(--text-secondary);line-height:1.5}
+
+/* Pipeline */
+.pipeline{display:flex;flex-direction:column;gap:0}
+.pipe-step{display:flex;align-items:flex-start;gap:16px;padding:16px 0}
+.pipe-num{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;flex-shrink:0;color:#fff}
+.pipe-connector{width:2px;height:20px;margin:0 auto;background:var(--border)}
+.pipe-content{flex:1}
+.pipe-content h4{font-size:14px;font-weight:600;margin-bottom:4px}
+.pipe-content p{font-size:12px;color:var(--text-secondary);line-height:1.6}
+.pipe-content .technique{font-size:11px;color:var(--accent-cyan);margin-top:4px}
+
+/* Table */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:10px 14px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);border-bottom:1px solid var(--border);font-weight:600}
+td{padding:11px 14px;border-bottom:1px solid var(--border)}
+tr:hover td{background:var(--bg-card-hover)}
+.status-tag{font-size:11px;padding:3px 8px;border-radius:4px;font-weight:600}
+
+/* SVG Charts */
+.svg-chart{width:100%;overflow:visible}
+
+/* Lightbox */
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:1000;cursor:pointer;animation:fadeIn .2s}
+.lightbox img{max-width:92vw;max-height:92vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,.5)}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+@media(max-width:768px){.sidebar{display:none}.stats{grid-template-columns:repeat(2,1fr)}.chart-gallery{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-hd">
+      <div class="sidebar-icon">C</div>
+      <div><h1>ChainInsight</h1><small>Supply Chain Intelligence</small></div>
+    </div>
+    <nav class="sidebar-nav" id="nav"></nav>
+    <div class="sidebar-ft">
+      <div class="lang-switch" id="lang-switch"></div>
+      <div class="info-row">
+        <span style="font-size:14px">📊</span>
+        <span id="info-label"></span>
+      </div>
+    </div>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+<div id="lightbox-root"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  ChainInsight — Vanilla JS Dashboard with i18n (zh / en / ja)
+// ═══════════════════════════════════════════════════════════════
+
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+
+// ══════════════════════════════════════
+//  i18n — Translation Dictionary
+// ══════════════════════════════════════
+const I18N = {
+  // ─── Nav & Titles ───
+  nav_overview:      { zh:'分析總覽',         en:'Overview',              ja:'分析概要' },
+  nav_pipeline:      { zh:'資料管線',         en:'Data Pipeline',         ja:'データパイプライン' },
+  nav_statistical:   { zh:'統計分析',         en:'Statistical Analysis',  ja:'統計分析' },
+  nav_supplychain:   { zh:'供應鏈優化',       en:'Supply Chain',          ja:'サプライチェーン最適化' },
+  nav_aiml:          { zh:'AI / ML 演算法',   en:'AI / ML Algorithms',    ja:'AI / ML アルゴリズム' },
+  nav_health:        { zh:'庫存健康',         en:'Inventory Health',      ja:'在庫健全性' },
+
+  title_overview:    { zh:'分析總覽儀表板',        en:'Analytics Overview Dashboard',       ja:'分析概要ダッシュボード' },
+  title_pipeline:    { zh:'8 步驟 ETL 資料管線',   en:'8-Step ETL Data Pipeline',           ja:'8ステップ ETL データパイプライン' },
+  title_statistical: { zh:'統計分析圖表總覽',       en:'Statistical Analysis Gallery',       ja:'統計分析チャートギャラリー' },
+  title_supplychain: { zh:'供應鏈優化分析',         en:'Supply Chain Optimization',          ja:'サプライチェーン最適化分析' },
+  title_aiml:        { zh:'AI / ML 演算法分析',     en:'AI / ML Algorithm Analysis',         ja:'AI / ML アルゴリズム分析' },
+  title_health:      { zh:'庫存健康儀表板',         en:'Inventory Health Dashboard',         ja:'在庫健全性ダッシュボード' },
+
+  // ─── Stats Cards ───
+  stat_total_products:   { zh:'產品總數',       en:'Total Products',       ja:'製品総数' },
+  stat_categories:       { zh:'產品類別數',     en:'Categories',           ja:'カテゴリ数' },
+  stat_vendors:          { zh:'供應商數',       en:'Vendors',              ja:'サプライヤー数' },
+  stat_avg_cost:         { zh:'平均單位成本',   en:'Avg Unit Cost',        ja:'平均単価' },
+  stat_oos_rate:         { zh:'缺貨率',         en:'OOS Rate',             ja:'欠品率' },
+  stat_total_inv_value:  { zh:'庫存總價值',     en:'Total Inventory Value', ja:'在庫総額' },
+  stat_low_stock:        { zh:'低庫存品項',     en:'Low Stock Items',      ja:'低在庫品目' },
+  stat_normal_stock:     { zh:'正常庫存品項',   en:'Normal Stock Items',   ja:'正常在庫品目' },
+
+  // ─── Stock Status ───
+  status_oos:     { zh:'缺貨',     en:'Out of Stock',  ja:'欠品' },
+  status_low:     { zh:'低庫存',   en:'Low Stock',     ja:'低在庫' },
+  status_normal:  { zh:'正常',     en:'Normal Stock',  ja:'正常在庫' },
+
+  // ─── Card Headers ───
+  hd_stock_dist:       { zh:'📊 庫存狀態分布',         en:'📊 Inventory Status Distribution',   ja:'📊 在庫ステータス分布' },
+  hd_cat_breakdown:    { zh:'📦 類別庫存分布',         en:'📦 Category Breakdown',              ja:'📦 カテゴリ別在庫分布' },
+  hd_abc_class:        { zh:'🎯 ABC 分類分布',         en:'🎯 ABC Classification',              ja:'🎯 ABC 分類分布' },
+  hd_top_vendors:      { zh:'🏢 供應商價值排名',       en:'🏢 Top Vendors by Value',            ja:'🏢 サプライヤー価値ランキング' },
+  hd_pipeline:         { zh:'🔧 ETL 資料管線',         en:'🔧 ETL Data Pipeline',               ja:'🔧 ETL データパイプライン' },
+  hd_data_quality:     { zh:'📋 資料品質摘要',         en:'📋 Data Quality Summary',            ja:'📋 データ品質サマリー' },
+  hd_algo_summary:     { zh:'🤖 30 演算法總覽',        en:'🤖 30 Algorithm Summary',            ja:'🤖 30アルゴリズム概要' },
+  hd_health_kpi:       { zh:'💊 庫存健康 KPI 說明',    en:'💊 Inventory Health KPI Guide',       ja:'💊 在庫健全性 KPI ガイド' },
+
+  // ─── Pipeline Steps ───
+  pipe1_title: { zh:'Product ID 清理',         en:'Product ID Cleanup',          ja:'Product ID クリーンアップ' },
+  pipe1_desc:  { zh:'去除前後空白字元',         en:'Strip leading/trailing whitespace', ja:'前後の空白を除去' },
+  pipe1_tech:  { zh:'str.strip()',             en:'str.strip()',                 ja:'str.strip()' },
+
+  pipe2_title: { zh:'Category 標準化',         en:'Category Standardization',    ja:'カテゴリ標準化' },
+  pipe2_desc:  { zh:'統一大小寫（如 electronics → Electronics）', en:'Normalize casing (e.g. electronics → Electronics)', ja:'大小文字の統一（例: electronics → Electronics）' },
+  pipe2_tech:  { zh:'str.strip().str.capitalize()', en:'str.strip().str.capitalize()', ja:'str.strip().str.capitalize()' },
+
+  pipe3_title: { zh:'Unit Cost 解析',           en:'Unit Cost Extraction',        ja:'単価抽出' },
+  pipe3_desc:  { zh:'從混合格式提取數值（USD 45.99, $30, Quote Pending → NaN）', en:'Extract numeric from mixed formats (USD 45.99, $30, Quote Pending → NaN)', ja:'混合フォーマットから数値抽出（USD 45.99, $30, Quote Pending → NaN）' },
+  pipe3_tech:  { zh:"re.sub(r'[^\\d.]', '', val)", en:"re.sub(r'[^\\d.]', '', val)", ja:"re.sub(r'[^\\d.]', '', val)" },
+
+  pipe4_title: { zh:'Current Stock 正規化',     en:'Stock Normalization',         ja:'在庫数正規化' },
+  pipe4_desc:  { zh:'轉換為數值，負值設為 0',   en:'Coerce to numeric, clamp negatives to 0', ja:'数値変換、負値を0に' },
+  pipe4_tech:  { zh:'pd.to_numeric(errors="coerce")', en:'pd.to_numeric(errors="coerce")', ja:'pd.to_numeric(errors="coerce")' },
+
+  pipe5_title: { zh:'空值處理',                 en:'Null Imputation',             ja:'欠損値補完' },
+  pipe5_desc:  { zh:'兩階段策略：類別中位數 → 全域中位數',  en:'Two-pass: category median → global median fallback', ja:'2段階戦略：カテゴリ中央値 → 全体中央値' },
+  pipe5_tech:  { zh:'groupby().transform(median)', en:'groupby().transform(median)', ja:'groupby().transform(median)' },
+
+  pipe6_title: { zh:'Vendor Name 清理',         en:'Vendor Name Cleanup',         ja:'ベンダー名クリーンアップ' },
+  pipe6_desc:  { zh:'去除空白字元',             en:'Strip whitespace',            ja:'空白除去' },
+  pipe6_tech:  { zh:'str.strip()',             en:'str.strip()',                 ja:'str.strip()' },
+
+  pipe7_title: { zh:'範圍驗證',                 en:'Range Validation',            ja:'範囲検証' },
+  pipe7_desc:  { zh:'裁剪至合理範圍（需求 ≥ 0、前置時間 ≥ 1）', en:'Clip to valid ranges (demand ≥ 0, lead time ≥ 1)', ja:'有効範囲にクリップ（需要 ≥ 0、リードタイム ≥ 1）' },
+  pipe7_tech:  { zh:'.clip(lower=0)',          en:'.clip(lower=0)',              ja:'.clip(lower=0)' },
+
+  pipe8_title: { zh:'衍生欄位計算',             en:'Derived Fields',              ja:'派生フィールド計算' },
+  pipe8_desc:  { zh:'Reorder Point、Stock Status、Inventory Value', en:'Reorder Point, Stock Status, Inventory Value', ja:'Reorder Point、Stock Status、Inventory Value' },
+  pipe8_tech:  { zh:'Demand × Lead Time + Safety Stock', en:'Demand × Lead Time + Safety Stock', ja:'Demand × Lead Time + Safety Stock' },
+
+  // ─── Pipeline Stats ───
+  pipe_before:       { zh:'清洗前',         en:'Before',         ja:'クリーニング前' },
+  pipe_after:        { zh:'清洗後',         en:'After',          ja:'クリーニング後' },
+  pipe_rows:         { zh:'資料列數',       en:'Rows',           ja:'行数' },
+  pipe_cols_in:      { zh:'輸入欄位',       en:'Input Columns',  ja:'入力カラム' },
+  pipe_cols_out:     { zh:'輸出欄位',       en:'Output Columns', ja:'出力カラム' },
+  pipe_issues:       { zh:'資料品質問題',   en:'Quality Issues', ja:'品質問題' },
+  pipe_issues_val:   { zh:'1,280+ 項',     en:'1,280+ issues',  ja:'1,280件以上' },
+  pipe_derived:      { zh:'衍生欄位',       en:'Derived Fields', ja:'派生フィールド' },
+
+  // ─── Chart Descriptions ───
+  chart_01_title: { zh:'相關矩陣分析',             en:'Correlation Matrix',             ja:'相関行列分析' },
+  chart_01_desc:  { zh:'Pearson vs Spearman 相關係數熱力圖，含 p 值顯著性檢定', en:'Pearson vs Spearman correlation heatmaps with p-value significance', ja:'Pearson vs Spearman 相関係数ヒートマップ（p値有意性検定付き）' },
+
+  chart_02_title: { zh:'分佈分析',                 en:'Distribution Analysis',          ja:'分布分析' },
+  chart_02_desc:  { zh:'6 項關鍵指標的直方圖 + KDE + Q-Q 圖，含 Shapiro-Wilk 檢定', en:'Histogram + KDE + Q-Q plots for 6 key metrics with Shapiro-Wilk tests', ja:'6指標のヒストグラム + KDE + Q-Qプロット（Shapiro-Wilk検定付き）' },
+
+  chart_03_title: { zh:'供應商績效分析',           en:'Vendor Performance',             ja:'ベンダーパフォーマンス' },
+  chart_03_desc:  { zh:'供應商績效箱型圖，含 ANOVA & Kruskal-Wallis 檢定', en:'Vendor performance box plots with ANOVA & Kruskal-Wallis tests', ja:'ベンダーパフォーマンス箱ひげ図（ANOVA & Kruskal-Wallis検定付き）' },
+
+  chart_04_title: { zh:'類別×供應商熱力圖',        en:'Category-Vendor Heatmap',        ja:'カテゴリ×ベンダーヒートマップ' },
+  chart_04_desc:  { zh:'交叉分析熱力圖，含卡方獨立性檢定', en:'Cross-tabulation heatmaps with Chi-square independence test', ja:'クロス集計ヒートマップ（カイ二乗検定付き）' },
+
+  chart_05_title: { zh:'迴歸分析',                 en:'Regression Analysis',            ja:'回帰分析' },
+  chart_05_desc:  { zh:'OLS 迴歸，含 95% 信賴區間與 Pearson/Spearman 統計', en:'OLS regression with 95% CI for 4 key variable pairs', ja:'OLS回帰（95%信頼区間、4変数ペア）' },
+
+  chart_06_title: { zh:'類別風險分析',             en:'Category Risk Profile',          ja:'カテゴリリスクプロファイル' },
+  chart_06_desc:  { zh:'庫存狀態分布、安全庫存覆蓋率、風險密度評分', en:'Stock status distribution, safety stock coverage, risk score density', ja:'在庫ステータス分布、安全在庫カバレッジ、リスクスコア密度' },
+
+  chart_07_title: { zh:'異常值與風險分析',         en:'Outlier Risk Analysis',          ja:'外れ値リスク分析' },
+  chart_07_desc:  { zh:'Z-score & IQR 異常偵測，需求強度 vs 覆蓋率風險象限', en:'Z-score & IQR outlier detection, demand intensity vs coverage risk quadrant', ja:'Z-score & IQR外れ値検出、需要強度 vs カバレッジリスク象限' },
+
+  chart_08_title: { zh:'變數配對圖',               en:'Pairplot Regression',            ja:'変数ペアプロット' },
+  chart_08_desc:  { zh:'關鍵變數配對圖，按庫存狀態著色', en:'Key variable pair plot colored by Stock Status', ja:'キー変数ペアプロット（在庫ステータス別着色）' },
+
+  chart_09_title: { zh:'EOQ 分析',                 en:'EOQ Analysis',                   ja:'EOQ 分析' },
+  chart_09_desc:  { zh:'經濟訂購量分佈、成本曲線、補貨頻率與節省潛力', en:'EOQ distribution, cost curves, reorder frequency, savings potential', ja:'経済的発注量分布、コスト曲線、発注頻度、削減ポテンシャル' },
+
+  chart_10_title: { zh:'供應商雷達圖',             en:'Vendor Radar Chart',             ja:'ベンダーレーダーチャート' },
+  chart_10_desc:  { zh:'多維度供應商比較（成本、覆蓋率、缺貨率、前置時間）', en:'Multi-dimensional vendor comparison (cost, coverage, OOS rate, lead time)', ja:'多次元ベンダー比較（コスト、カバレッジ、欠品率、リードタイム）' },
+
+  chart_11_title: { zh:'庫存價值樹狀圖',           en:'Inventory Treemap',              ja:'在庫価値ツリーマップ' },
+  chart_11_desc:  { zh:'庫存價值樹狀圖 + 巢狀甜甜圈圖（類別×供應商）', en:'Inventory value treemap + nested donut (category × vendor)', ja:'在庫価値ツリーマップ + ネストドーナツ（カテゴリ×ベンダー）' },
+
+  chart_12_title: { zh:'蒙地卡羅模擬',             en:'Monte Carlo Simulation',         ja:'モンテカルロシミュレーション' },
+  chart_12_desc:  { zh:'5,000 次模擬的缺貨機率估算（按類別）', en:'Stockout probability estimation from 5,000 simulations per category', ja:'カテゴリ別5,000回シミュレーションの欠品確率推定' },
+
+  chart_13_title: { zh:'補貨缺口分析',             en:'Reorder Gap Analysis',           ja:'発注ギャップ分析' },
+  chart_13_desc:  { zh:'補貨缺口瀑布圖、緊急 SKU 排名、優先補貨矩陣', en:'Reorder gap waterfall, top 25 urgent SKUs, replenishment priority matrix', ja:'発注ギャップウォーターフォール、緊急SKU25、補充優先マトリクス' },
+
+  chart_14_title: { zh:'需求與安全庫存分析',       en:'Demand & Safety Stock',          ja:'需要と安全在庫分析' },
+  chart_14_desc:  { zh:'需求變異係數、安全庫存漏斗、服務水準曲線、前置時間風險', en:'Demand CV, safety stock funnel, service level curve, lead time risk heatmap', ja:'需要変動係数、安全在庫ファネル、サービスレベル曲線、リードタイムリスク' },
+
+  chart_15_title: { zh:'分類演算法比較',           en:'Classification Comparison',      ja:'分類アルゴリズム比較' },
+  chart_15_desc:  { zh:'10 種演算法精確度排名、交叉驗證分數、過擬合檢查', en:'10-algorithm accuracy ranking, CV scores, overfitting check, top-3 confusion matrices', ja:'10アルゴリズム精度ランキング、CV スコア、過学習チェック' },
+
+  chart_16_title: { zh:'特徵重要性分析',           en:'Feature Importance',             ja:'特徴量重要度' },
+  chart_16_desc:  { zh:'RF、Gradient Boosting、Decision Tree、Logistic Regression 特徵重要性', en:'Feature importance from RF, GB, DT, Logistic Regression', ja:'RF、GB、DT、ロジスティック回帰の特徴量重要度' },
+
+  chart_17_title: { zh:'迴歸預測分析',             en:'Regression Prediction',          ja:'回帰予測分析' },
+  chart_17_desc:  { zh:'實際 vs 預測散佈圖（3 模型）、R²/RMSE 比較、殘差分佈', en:'Actual vs predicted scatter (3 models), R²/RMSE comparison, residual distribution', ja:'実測 vs 予測散布図（3モデル）、R²/RMSE比較、残差分布' },
+
+  chart_18_title: { zh:'分群分析',                 en:'Clustering Analysis',            ja:'クラスタリング分析' },
+  chart_18_desc:  { zh:'手肘法 + 輪廓係數、K-Means++/階層式/DBSCAN 結果', en:'Elbow + silhouette, K-Means++/Hierarchical/DBSCAN results, cluster profiles', ja:'エルボー法 + シルエット係数、K-Means++/階層型/DBSCAN結果' },
+
+  chart_19_title: { zh:'降維分析 (PCA/t-SNE)',     en:'PCA & t-SNE',                    ja:'次元削減 (PCA/t-SNE)' },
+  chart_19_desc:  { zh:'PCA 解釋變異量、2D 投影（按狀態/類別著色）、t-SNE 嵌入', en:'PCA variance explained, 2D projections (by status & category), t-SNE embedding', ja:'PCA分散説明量、2D投影（ステータス/カテゴリ別）、t-SNE埋め込み' },
+
+  chart_20_title: { zh:'異常偵測',                 en:'Anomaly Detection',              ja:'異常検出' },
+  chart_20_desc:  { zh:'Isolation Forest + Autoencoder 異常偵測、交叉一致性分析', en:'Isolation Forest + Autoencoder anomaly detection, cross-method agreement', ja:'Isolation Forest + オートエンコーダ異常検出、クロス手法一致分析' },
+
+  chart_21_title: { zh:'基因演算法最佳化',         en:'Genetic Algorithm',              ja:'遺伝的アルゴリズム' },
+  chart_21_desc:  { zh:'GA 收斂曲線、最佳安全庫存乘數、成本節省、基因演化追蹤', en:'GA convergence, optimal safety stock multipliers, cost savings, gene evolution', ja:'GA収束曲線、最適安全在庫係数、コスト削減、遺伝子進化追跡' },
+
+  chart_22_title: { zh:'30 演算法適用性矩陣',      en:'30-Algorithm Overview',          ja:'30アルゴリズム適用マトリクス' },
+  chart_22_desc:  { zh:'30 種 AI 演算法適用性矩陣（含狀態、分類、用途、函式庫）', en:'30-algorithm suitability matrix with status, category, use case, library', ja:'30種AIアルゴリズム適用性マトリクス（ステータス、分類、用途、ライブラリ）' },
+
+  chart_0_title:  { zh:'庫存健康與缺貨風險',       en:'Inventory Health & Stockout Risk', ja:'在庫健全性と欠品リスク' },
+  chart_0_desc:   { zh:'KPI 卡片、庫存效率矩陣、ABC Pareto 分析、缺貨警報表', en:'KPI cards, inventory efficiency scatter, ABC Pareto, stockout alert table', ja:'KPIカード、在庫効率マトリクス、ABC パレート分析、欠品アラート表' },
+
+  // ─── Algorithm Table ───
+  algo_num:       { zh:'#',         en:'#',         ja:'#' },
+  algo_name:      { zh:'演算法',   en:'Algorithm',  ja:'アルゴリズム' },
+  algo_category:  { zh:'分類',     en:'Category',   ja:'カテゴリ' },
+  algo_status:    { zh:'狀態',     en:'Status',     ja:'ステータス' },
+  algo_usecase:   { zh:'供應鏈應用', en:'Supply Chain Use Case', ja:'サプライチェーン応用' },
+
+  // ─── Health KPIs ───
+  kpi_dsi:           { zh:'DSI (Days Sales of Inventory)', en:'DSI (Days Sales of Inventory)', ja:'DSI（在庫日数）' },
+  kpi_dsi_desc:      { zh:'庫存可供銷售天數 = 現有庫存 / 每日需求', en:'Days of inventory on hand = Current Stock / Daily Demand', ja:'在庫が何日分あるか = 現在庫 / 日次需要' },
+  kpi_abc:           { zh:'ABC 分類', en:'ABC Classification', ja:'ABC 分類' },
+  kpi_abc_desc:      { zh:'A (前 80% 價值) / B (80-95%) / C (95-100%)，基於 Pareto 法則', en:'A (top 80% value) / B (80-95%) / C (95-100%), based on Pareto principle', ja:'A（上位80%価値）/ B（80-95%）/ C（95-100%）、パレート法則に基づく' },
+  kpi_reorder:       { zh:'Reorder Point', en:'Reorder Point', ja:'発注点' },
+  kpi_reorder_desc:  { zh:'觸發補貨的庫存水位 = 需求 × 前置時間 + 安全庫存', en:'Stock level triggering replenishment = Demand × Lead Time + Safety Stock', ja:'補充トリガーの在庫水準 = 需要 × リードタイム + 安全在庫' },
+  kpi_oos:           { zh:'OOS Rate (缺貨率)', en:'OOS Rate (Out of Stock)', ja:'欠品率（OOS Rate）' },
+  kpi_oos_desc:      { zh:'庫存為 0 的品項佔比，反映供應鏈可靠性', en:'Percentage of items with zero stock, reflects supply chain reliability', ja:'在庫ゼロ品目の割合、サプライチェーンの信頼性を反映' },
+
+  // ─── Labels / UI ───
+  loading:         { zh:'載入中...',           en:'Loading...',             ja:'読み込み中...' },
+  data_source:     { zh:'資料來源：Supply_Chain_Inventory_Clean.csv', en:'Data Source: Supply_Chain_Inventory_Clean.csv', ja:'データソース：Supply_Chain_Inventory_Clean.csv' },
+  click_enlarge:   { zh:'點擊圖片放大',       en:'Click image to enlarge', ja:'クリックで拡大' },
+  items:           { zh:'項',                 en:'items',                  ja:'件' },
+  products:        { zh:'項產品',             en:'products',               ja:'製品' },
+  value_unit:      { zh:'$',                 en:'$',                      ja:'$' },
+  applied:         { zh:'已應用',             en:'Applied',                ja:'適用済' },
+  not_applicable:  { zh:'N/A (需不同資料)',   en:'N/A (needs different data)', ja:'N/A（異なるデータが必要）' },
+
+  // ─── Language ───
+  lang_label: { zh:'🌐', en:'🌐', ja:'🌐' },
+};
+
+// ──────────────────────────
+//  i18n runtime
+// ──────────────────────────
+const LANGS = [
+  { code:'zh', label:'中文' },
+  { code:'en', label:'EN' },
+  { code:'ja', label:'日本語' },
+];
+
+function t(key) {
+  const entry = I18N[key];
+  if (!entry) return key;
+  return entry[S.lang] || entry.zh || key;
+}
+
+function localeDateStr() {
+  const loc = S.lang === 'ja' ? 'ja-JP' : S.lang === 'en' ? 'en-US' : 'zh-TW';
+  const n = new Date();
+  return n.toLocaleDateString(loc, { year:'numeric', month:'long', day:'numeric' });
+}
+
+// ─── State ───
+const S = {
+  lang: localStorage.getItem('ci_lang') || 'zh',
+  view: 'overview',
+  data: null,
+  loading: true,
+};
+
+// ─── Helpers ───
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function fmt(n) { return n.toLocaleString(S.lang === 'ja' ? 'ja-JP' : S.lang === 'en' ? 'en-US' : 'zh-TW'); }
+function fmtCurrency(n) { return '$' + fmt(Math.round(n)); }
+
+const COLORS = {
+  'Electronics':'#3b82f6','Home':'#10b981','Food':'#f59e0b','Shipping':'#8b5cf6',
+  'Office':'#f97316','Apparel':'#ec4899','Industrial':'#06b6d4'
+};
+const STATUS_COLORS = {'Out of Stock':'var(--status-oos)','Low Stock':'var(--status-low)','Normal Stock':'var(--status-normal)'};
+const PIPE_COLORS = ['#3b82f6','#06b6d4','#10b981','#f59e0b','#f97316','#ef4444','#8b5cf6','#ec4899'];
+
+const NAV_KEYS = [
+  {id:'overview',    icon:'📊', key:'nav_overview'},
+  {id:'pipeline',    icon:'🔧', key:'nav_pipeline'},
+  {id:'statistical', icon:'📈', key:'nav_statistical'},
+  {id:'supplychain', icon:'🏭', key:'nav_supplychain'},
+  {id:'aiml',        icon:'🤖', key:'nav_aiml'},
+  {id:'health',      icon:'💊', key:'nav_health'},
+];
+
+const TITLE_MAP = {
+  overview:'title_overview', pipeline:'title_pipeline', statistical:'title_statistical',
+  supplychain:'title_supplychain', aiml:'title_aiml', health:'title_health'
+};
+
+// ─── CSV Parser ───
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  const headers = lines[0].split(',').map(h => h.trim());
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const vals = lines[i].split(',');
+    if (vals.length < headers.length) continue;
+    const obj = {};
+    headers.forEach((h, j) => {
+      const v = (vals[j] || '').trim();
+      obj[h] = isNaN(v) || v === '' ? v : parseFloat(v);
+    });
+    rows.push(obj);
+  }
+  return rows;
+}
+
+// ─── Compute KPIs from data ───
+function computeKPIs(data) {
+  const total = data.length;
+  const categories = new Set(data.map(r => r.Category));
+  const vendors = new Set(data.map(r => r.Vendor_Name));
+  const avgCost = data.reduce((s, r) => s + (r.Unit_Cost || 0), 0) / total;
+  const oos = data.filter(r => r.Stock_Status === 'Out of Stock').length;
+  const low = data.filter(r => r.Stock_Status === 'Low Stock').length;
+  const normal = data.filter(r => r.Stock_Status === 'Normal Stock').length;
+  const totalValue = data.reduce((s, r) => s + (r.Inventory_Value || 0), 0);
+
+  // Category breakdown
+  const catBreakdown = {};
+  data.forEach(r => {
+    if (!catBreakdown[r.Category]) catBreakdown[r.Category] = { count: 0, value: 0, stock: 0 };
+    catBreakdown[r.Category].count++;
+    catBreakdown[r.Category].value += r.Inventory_Value || 0;
+    catBreakdown[r.Category].stock += r.Current_Stock || 0;
+  });
+
+  // Vendor breakdown
+  const vendorBreakdown = {};
+  data.forEach(r => {
+    if (!vendorBreakdown[r.Vendor_Name]) vendorBreakdown[r.Vendor_Name] = { count: 0, value: 0 };
+    vendorBreakdown[r.Vendor_Name].count++;
+    vendorBreakdown[r.Vendor_Name].value += r.Inventory_Value || 0;
+  });
+
+  // ABC classification
+  const sorted = [...data].filter(r => r.Inventory_Value > 0).sort((a, b) => b.Inventory_Value - a.Inventory_Value);
+  const cumVal = [];
+  let running = 0;
+  sorted.forEach(r => { running += r.Inventory_Value; cumVal.push(running); });
+  const totalVal = running;
+  let aCount = 0, bCount = 0, cCount = 0;
+  sorted.forEach((r, i) => {
+    const pct = cumVal[i] / totalVal;
+    if (pct <= 0.8) aCount++;
+    else if (pct <= 0.95) bCount++;
+    else cCount++;
+  });
+
+  return {
+    total, categories: categories.size, vendors: vendors.size,
+    avgCost, oosRate: (oos / total * 100), oosCount: oos, lowCount: low, normalCount: normal,
+    totalValue, catBreakdown, vendorBreakdown,
+    abc: { a: aCount, b: bCount, c: cCount }
+  };
+}
+
+// ─── Load Data ───
+async function loadData() {
+  try {
+    const resp = await fetch('Supply_Chain_Inventory_Clean.csv');
+    const text = await resp.text();
+    S.data = parseCSV(text);
+    S.loading = false;
+  } catch (e) {
+    S.loading = false;
+    S.data = null;
+  }
+  render();
+}
+
+// ══════════════════════════════
+//  Render Functions
+// ══════════════════════════════
+
+function renderLangSwitch() {
+  const el = $('#lang-switch');
+  if (!el) return;
+  el.innerHTML = `<span>${t('lang_label')}</span><div class="lang-bar">${LANGS.map(l =>
+    `<button class="lang-btn ${S.lang===l.code?'on':''}" data-lang="${l.code}">${l.label}</button>`
+  ).join('')}</div>`;
+  el.querySelectorAll('.lang-btn').forEach(b => b.onclick = () => {
+    S.lang = b.dataset.lang;
+    localStorage.setItem('ci_lang', S.lang);
+    render();
+    renderLangSwitch();
+  });
+}
+
+function renderNav() {
+  const n = $('#nav');
+  n.innerHTML = NAV_KEYS.map(i => `
+    <button class="nav-btn ${S.view===i.id?'active':''}" data-nav="${i.id}">
+      <span style="font-size:15px">${i.icon}</span> ${t(i.key)}
+    </button>`).join('');
+  n.querySelectorAll('.nav-btn').forEach(b => b.onclick = () => { S.view = b.dataset.nav; render(); });
+}
+
+function statsHTML(kpi) {
+  const items = [
+    {l:t('stat_total_products'),  v:fmt(kpi.total),           c:'var(--accent-blue)'},
+    {l:t('stat_categories'),      v:kpi.categories,           c:'var(--accent-cyan)'},
+    {l:t('stat_vendors'),         v:kpi.vendors,              c:'var(--accent-purple)'},
+    {l:t('stat_avg_cost'),        v:'$'+kpi.avgCost.toFixed(2), c:'var(--accent-green)'},
+    {l:t('stat_oos_rate'),        v:kpi.oosRate.toFixed(1)+'%', c:'var(--accent-red)'},
+    {l:t('stat_total_inv_value'), v:fmtCurrency(kpi.totalValue), c:'var(--accent-orange)', sub:fmt(kpi.total)+' '+t('products')},
+  ];
+  return `<div class="stats">${items.map(i=>`<div class="stat"><div class="stat-label">${i.l}</div><div class="stat-val" style="color:${i.c}">${i.v}</div>${i.sub?`<div class="stat-sub">${i.sub}</div>`:''}</div>`).join('')}</div>`;
+}
+
+// ─── SVG Pie Chart ───
+function svgPie(data, size) {
+  const W = size, cx = W/2, cy = W/2, r = W/2 - 10;
+  const total = data.reduce((s,d) => s + d.value, 0);
+  let angle = -Math.PI/2;
+  let paths = '';
+  let legend = '';
+  data.forEach((d, i) => {
+    const slice = (d.value / total) * Math.PI * 2;
+    const x1 = cx + r * Math.cos(angle);
+    const y1 = cy + r * Math.sin(angle);
+    const x2 = cx + r * Math.cos(angle + slice);
+    const y2 = cy + r * Math.sin(angle + slice);
+    const large = slice > Math.PI ? 1 : 0;
+    paths += `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} Z" fill="${d.color}" opacity="0.85"><title>${d.label}: ${d.value} (${(d.value/total*100).toFixed(1)}%)</title></path>`;
+    const pct = (d.value / total * 100).toFixed(1);
+    legend += `<div style="display:flex;align-items:center;gap:6px;font-size:12px"><div style="width:10px;height:10px;border-radius:3px;background:${d.color}"></div><span style="color:var(--text-secondary)">${d.label}</span><span style="margin-left:auto;font-weight:600">${d.value} (${pct}%)</span></div>`;
+    angle += slice;
+  });
+  return `<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap"><svg width="${W}" height="${W}" viewBox="0 0 ${W} ${W}">${paths}</svg><div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:140px">${legend}</div></div>`;
+}
+
+// ─── SVG Bar Chart ───
+function svgBars(data, width, height) {
+  const W = width, H = height, PAD_L = 100, PAD_R = 60, PAD_T = 10, PAD_B = 10;
+  const maxVal = Math.max(...data.map(d => d.value));
+  const barH = Math.min(28, (H - PAD_T - PAD_B) / data.length - 4);
+  let bars = '';
+  data.forEach((d, i) => {
+    const y = PAD_T + i * (barH + 4);
+    const w = maxVal > 0 ? (d.value / maxVal) * (W - PAD_L - PAD_R) : 0;
+    bars += `<text x="${PAD_L-8}" y="${y+barH/2+4}" fill="var(--text-secondary)" font-size="11" text-anchor="end">${esc(d.label)}</text>`;
+    bars += `<rect x="${PAD_L}" y="${y}" width="${w}" height="${barH}" rx="4" fill="${d.color}" opacity="0.8"><title>${d.label}: ${typeof d.display !== 'undefined' ? d.display : fmt(Math.round(d.value))}</title></rect>`;
+    bars += `<text x="${PAD_L+w+6}" y="${y+barH/2+4}" fill="var(--text-primary)" font-size="11" font-weight="600">${typeof d.display !== 'undefined' ? d.display : fmt(Math.round(d.value))}</text>`;
+  });
+  return `<svg width="100%" viewBox="0 0 ${W} ${H}" class="svg-chart">${bars}</svg>`;
+}
+
+// ─── SVG Donut ───
+function svgDonut(data, size) {
+  const W = size, cx = W/2, cy = W/2, R = W/2 - 10, r = R * 0.55;
+  const total = data.reduce((s,d) => s + d.value, 0);
+  let angle = -Math.PI/2;
+  let paths = '';
+  data.forEach(d => {
+    const slice = (d.value / total) * Math.PI * 2;
+    if (slice <= 0) { angle += slice; return; }
+    const x1o = cx + R * Math.cos(angle), y1o = cy + R * Math.sin(angle);
+    const x2o = cx + R * Math.cos(angle + slice), y2o = cy + R * Math.sin(angle + slice);
+    const x1i = cx + r * Math.cos(angle + slice), y1i = cy + r * Math.sin(angle + slice);
+    const x2i = cx + r * Math.cos(angle), y2i = cy + r * Math.sin(angle);
+    const large = slice > Math.PI ? 1 : 0;
+    paths += `<path d="M${x1o},${y1o} A${R},${R} 0 ${large} 1 ${x2o},${y2o} L${x1i},${y1i} A${r},${r} 0 ${large} 0 ${x2i},${y2i} Z" fill="${d.color}" opacity="0.85"><title>${d.label}: ${d.value} (${(d.value/total*100).toFixed(1)}%)</title></path>`;
+    angle += slice;
+  });
+  // Center text
+  paths += `<text x="${cx}" y="${cy-6}" fill="var(--text-primary)" font-size="18" font-weight="700" text-anchor="middle">${total}</text>`;
+  paths += `<text x="${cx}" y="${cy+12}" fill="var(--text-muted)" font-size="10" text-anchor="middle">${t('items')}</text>`;
+  let legend = '';
+  data.forEach(d => {
+    const pct = (d.value / total * 100).toFixed(1);
+    legend += `<div style="display:flex;align-items:center;gap:6px;font-size:12px"><div style="width:10px;height:10px;border-radius:3px;background:${d.color}"></div><span style="color:var(--text-secondary)">${d.label}</span><span style="margin-left:auto;font-weight:600">${pct}%</span></div>`;
+  });
+  return `<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap"><svg width="${W}" height="${W}" viewBox="0 0 ${W} ${W}">${paths}</svg><div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:120px">${legend}</div></div>`;
+}
+
+// ─── Chart Gallery Item ───
+function chartItemHTML(file, titleKey, descKey) {
+  return `<div class="chart-item">
+    <img src="${file}" alt="${t(titleKey)}" loading="lazy" onclick="openLightbox(this.src)">
+    <div class="chart-info">
+      <div class="chart-title">${t(titleKey)}</div>
+      <div class="chart-desc">${t(descKey)}</div>
+    </div>
+  </div>`;
+}
+
+// ─── Lightbox ───
+function openLightbox(src) {
+  const root = $('#lightbox-root');
+  root.innerHTML = `<div class="lightbox" onclick="closeLightbox()"><img src="${src}"></div>`;
+}
+function closeLightbox() {
+  $('#lightbox-root').innerHTML = '';
+}
+
+// ─── Views ───
+function overviewHTML() {
+  if (!S.data) return `<div class="empty">${t('loading')}</div>`;
+  const kpi = computeKPIs(S.data);
+
+  // Pie: Stock Status Distribution
+  const pieData = [
+    {label:t('status_oos'), value:kpi.oosCount, color:'var(--status-oos)'},
+    {label:t('status_low'), value:kpi.lowCount, color:'var(--status-low)'},
+    {label:t('status_normal'), value:kpi.normalCount, color:'var(--status-normal)'},
+  ];
+
+  // Bar: Category breakdown by value
+  const catEntries = Object.entries(kpi.catBreakdown).sort((a,b) => b[1].value - a[1].value);
+  const barData = catEntries.map(([cat, d]) => ({
+    label: cat, value: d.value, display: fmtCurrency(d.value), color: COLORS[cat] || '#3b82f6'
+  }));
+
+  // Donut: ABC classification
+  const abcData = [
+    {label:'A (80%)', value:kpi.abc.a, color:'var(--accent-red)'},
+    {label:'B (15%)', value:kpi.abc.b, color:'var(--accent-yellow)'},
+    {label:'C (5%)',  value:kpi.abc.c, color:'var(--accent-green)'},
+  ];
+
+  // Top vendors
+  const vendorEntries = Object.entries(kpi.vendorBreakdown).sort((a,b) => b[1].value - a[1].value);
+  const vendorBarData = vendorEntries.map(([name, d]) => ({
+    label: name, value: d.value, display: fmtCurrency(d.value), color: 'var(--accent-blue)'
+  }));
+
+  let html = statsHTML(kpi);
+  html += `<div class="grid2">`;
+  html += `<div class="card"><div class="card-hd"><h3>${t('hd_stock_dist')}</h3></div><div class="card-body">${svgPie(pieData, 180)}</div></div>`;
+  html += `<div class="card"><div class="card-hd"><h3>${t('hd_cat_breakdown')}</h3></div><div class="card-body">${svgBars(barData, 500, barData.length * 32 + 20)}</div></div>`;
+  html += `</div>`;
+  html += `<div class="grid2">`;
+  html += `<div class="card"><div class="card-hd"><h3>${t('hd_abc_class')}</h3></div><div class="card-body">${svgDonut(abcData, 180)}</div></div>`;
+  html += `<div class="card"><div class="card-hd"><h3>${t('hd_top_vendors')}</h3></div><div class="card-body">${svgBars(vendorBarData, 500, vendorBarData.length * 32 + 20)}</div></div>`;
+  html += `</div>`;
+  return html;
+}
+
+function pipelineHTML() {
+  let html = '';
+
+  // Before/After stats
+  html += `<div class="grid2" style="margin-bottom:20px">`;
+  html += `<div class="card"><div class="card-hd"><h3>${t('pipe_before')}</h3><span class="card-badge" style="background:rgba(239,68,68,.15);color:var(--accent-red)">Raw</span></div><div class="card-body">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div><div class="stat-label">${t('pipe_rows')}</div><div style="font-size:20px;font-weight:700;color:var(--accent-yellow)">10,050</div></div>
+      <div><div class="stat-label">${t('pipe_cols_in')}</div><div style="font-size:20px;font-weight:700;color:var(--accent-yellow)">8</div></div>
+      <div><div class="stat-label">${t('pipe_issues')}</div><div style="font-size:20px;font-weight:700;color:var(--accent-red)">${t('pipe_issues_val')}</div></div>
+    </div></div></div>`;
+  html += `<div class="card"><div class="card-hd"><h3>${t('pipe_after')}</h3><span class="card-badge" style="background:rgba(16,185,129,.15);color:var(--accent-green)">Clean</span></div><div class="card-body">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div><div class="stat-label">${t('pipe_rows')}</div><div style="font-size:20px;font-weight:700;color:var(--accent-green)">10,050</div></div>
+      <div><div class="stat-label">${t('pipe_cols_out')}</div><div style="font-size:20px;font-weight:700;color:var(--accent-green)">11</div></div>
+      <div><div class="stat-label">${t('pipe_derived')}</div><div style="font-size:20px;font-weight:700;color:var(--accent-cyan)">3</div></div>
+    </div></div></div>`;
+  html += `</div>`;
+
+  // Pipeline steps
+  html += `<div class="card"><div class="card-hd"><h3>${t('hd_pipeline')}</h3><span class="card-badge" style="background:rgba(59,130,246,.15);color:var(--accent-blue)">8 Steps</span></div><div class="card-body">`;
+  for (let i = 1; i <= 8; i++) {
+    html += `<div class="pipe-step">
+      <div class="pipe-num" style="background:${PIPE_COLORS[i-1]}">${i}</div>
+      <div class="pipe-content">
+        <h4>${t('pipe'+i+'_title')}</h4>
+        <p>${t('pipe'+i+'_desc')}</p>
+        <div class="technique">${t('pipe'+i+'_tech')}</div>
+      </div>
+    </div>`;
+    if (i < 8) html += `<div class="pipe-connector"></div>`;
+  }
+  html += `</div></div>`;
+  return html;
+}
+
+function statisticalHTML() {
+  const charts = [
+    {file:'chart_01_correlation_matrix.png',    title:'chart_01_title', desc:'chart_01_desc'},
+    {file:'chart_02_distribution_analysis.png', title:'chart_02_title', desc:'chart_02_desc'},
+    {file:'chart_03_vendor_performance.png',    title:'chart_03_title', desc:'chart_03_desc'},
+    {file:'chart_04_category_vendor_heatmap.png',title:'chart_04_title',desc:'chart_04_desc'},
+    {file:'chart_05_regression_analysis.png',   title:'chart_05_title', desc:'chart_05_desc'},
+    {file:'chart_06_category_risk_profile.png', title:'chart_06_title', desc:'chart_06_desc'},
+    {file:'chart_07_outlier_risk_analysis.png', title:'chart_07_title', desc:'chart_07_desc'},
+    {file:'chart_08_pairplot_regression.png',   title:'chart_08_title', desc:'chart_08_desc'},
+  ];
+  let html = `<p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">${t('click_enlarge')}</p>`;
+  html += `<div class="chart-gallery">${charts.map(c => chartItemHTML(c.file, c.title, c.desc)).join('')}</div>`;
+  return html;
+}
+
+function supplychainHTML() {
+  const charts = [
+    {file:'chart_09_eoq_analysis.png',           title:'chart_09_title', desc:'chart_09_desc'},
+    {file:'chart_10_vendor_radar.png',            title:'chart_10_title', desc:'chart_10_desc'},
+    {file:'chart_11_inventory_treemap.png',       title:'chart_11_title', desc:'chart_11_desc'},
+    {file:'chart_12_monte_carlo_stockout.png',    title:'chart_12_title', desc:'chart_12_desc'},
+    {file:'chart_13_reorder_gap_waterfall.png',   title:'chart_13_title', desc:'chart_13_desc'},
+    {file:'chart_14_demand_safety_stock.png',     title:'chart_14_title', desc:'chart_14_desc'},
+  ];
+  let html = `<p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">${t('click_enlarge')}</p>`;
+  html += `<div class="chart-gallery">${charts.map(c => chartItemHTML(c.file, c.title, c.desc)).join('')}</div>`;
+  return html;
+}
+
+function aimlHTML() {
+  const charts = [
+    {file:'chart_15_classification_comparison.png', title:'chart_15_title', desc:'chart_15_desc'},
+    {file:'chart_16_feature_importance.png',         title:'chart_16_title', desc:'chart_16_desc'},
+    {file:'chart_17_regression_prediction.png',      title:'chart_17_title', desc:'chart_17_desc'},
+    {file:'chart_18_clustering_analysis.png',        title:'chart_18_title', desc:'chart_18_desc'},
+    {file:'chart_19_pca_tsne.png',                   title:'chart_19_title', desc:'chart_19_desc'},
+    {file:'chart_20_anomaly_detection.png',           title:'chart_20_title', desc:'chart_20_desc'},
+    {file:'chart_21_genetic_algorithm.png',           title:'chart_21_title', desc:'chart_21_desc'},
+    {file:'chart_22_algorithm_overview.png',          title:'chart_22_title', desc:'chart_22_desc'},
+  ];
+
+  // Algorithm summary table
+  const algos = [
+    {n:1,  name:'Linear Regression',     cat:{zh:'迴歸',en:'Regression',ja:'回帰'},         status:true,  uc:{zh:'庫存價值預測',en:'Inventory value prediction',ja:'在庫価値予測'}},
+    {n:2,  name:'Logistic Regression',   cat:{zh:'分類',en:'Classification',ja:'分類'},     status:true,  uc:{zh:'庫存狀態分類',en:'Stock status classification',ja:'在庫ステータス分類'}},
+    {n:3,  name:'Decision Tree',         cat:{zh:'分類',en:'Classification',ja:'分類'},     status:true,  uc:{zh:'庫存狀態分類',en:'Stock status classification',ja:'在庫ステータス分類'}},
+    {n:4,  name:'Random Forest',         cat:{zh:'集成',en:'Ensemble',ja:'アンサンブル'},   status:true,  uc:{zh:'分類 + 迴歸',en:'Classification + Regression',ja:'分類 + 回帰'}},
+    {n:5,  name:'SVM',                   cat:{zh:'核方法',en:'Kernel',ja:'カーネル'},       status:true,  uc:{zh:'庫存狀態分類',en:'Stock status classification',ja:'在庫ステータス分類'}},
+    {n:6,  name:'k-NN',                  cat:{zh:'實例',en:'Instance',ja:'インスタンス'},   status:true,  uc:{zh:'庫存狀態分類',en:'Stock status classification',ja:'在庫ステータス分類'}},
+    {n:7,  name:'Naive Bayes',           cat:{zh:'機率',en:'Probabilistic',ja:'確率'},     status:true,  uc:{zh:'庫存狀態分類',en:'Stock status classification',ja:'在庫ステータス分類'}},
+    {n:8,  name:'Gradient Boosting',     cat:{zh:'集成',en:'Ensemble',ja:'アンサンブル'},   status:true,  uc:{zh:'分類 + 迴歸',en:'Classification + Regression',ja:'分類 + 回帰'}},
+    {n:9,  name:'AdaBoost',              cat:{zh:'集成',en:'Ensemble',ja:'アンサンブル'},   status:true,  uc:{zh:'庫存狀態分類',en:'Stock status classification',ja:'在庫ステータス分類'}},
+    {n:10, name:'XGBoost',               cat:{zh:'集成',en:'Ensemble',ja:'アンサンブル'},   status:true,  uc:{zh:'庫存狀態分類',en:'Stock status classification',ja:'在庫ステータス分類'}},
+    {n:11, name:'K-Means',               cat:{zh:'分群',en:'Clustering',ja:'クラスタリング'}, status:true, uc:{zh:'庫存分群',en:'Inventory segmentation',ja:'在庫セグメンテーション'}},
+    {n:12, name:'Hierarchical',          cat:{zh:'分群',en:'Clustering',ja:'クラスタリング'}, status:true, uc:{zh:'階層式分群',en:'Agglomerative grouping',ja:'凝集型グルーピング'}},
+    {n:13, name:'DBSCAN',                cat:{zh:'分群',en:'Clustering',ja:'クラスタリング'}, status:true, uc:{zh:'密度分群',en:'Density-based clustering',ja:'密度ベースクラスタリング'}},
+    {n:14, name:'PCA',                   cat:{zh:'降維',en:'Dim. Reduction',ja:'次元削減'},  status:true, uc:{zh:'特徵壓縮',en:'Feature compression',ja:'特徴圧縮'}},
+    {n:15, name:'t-SNE',                 cat:{zh:'降維',en:'Dim. Reduction',ja:'次元削減'},  status:true, uc:{zh:'2D 嵌入',en:'2D embedding',ja:'2D埋め込み'}},
+    {n:16, name:'Q-Learning',            cat:{zh:'強化學習',en:'RL',ja:'強化学習'},          status:false, uc:{zh:'補貨策略',en:'Reorder policy',ja:'発注ポリシー'}},
+    {n:17, name:'DQN',                   cat:{zh:'深度 RL',en:'Deep RL',ja:'深層RL'},       status:false, uc:{zh:'動態補貨',en:'Dynamic reorder',ja:'動的発注'}},
+    {n:18, name:'PPO',                   cat:{zh:'深度 RL',en:'Deep RL',ja:'深層RL'},       status:false, uc:{zh:'倉儲調度',en:'Warehouse scheduling',ja:'倉庫スケジューリング'}},
+    {n:19, name:'SAC',                   cat:{zh:'深度 RL',en:'Deep RL',ja:'深層RL'},       status:false, uc:{zh:'連續控制',en:'Continuous control',ja:'連続制御'}},
+    {n:20, name:'A2C',                   cat:{zh:'深度 RL',en:'Deep RL',ja:'深層RL'},       status:false, uc:{zh:'多目標',en:'Multi-objective',ja:'多目的'}},
+    {n:21, name:'ANN / MLP',             cat:{zh:'深度學習',en:'Deep Learning',ja:'深層学習'}, status:true, uc:{zh:'庫存狀態分類',en:'Stock status classification',ja:'在庫ステータス分類'}},
+    {n:22, name:'CNN',                   cat:{zh:'深度學習',en:'Deep Learning',ja:'深層学習'}, status:false, uc:{zh:'影像品檢',en:'Visual inspection',ja:'画像品質検査'}},
+    {n:23, name:'RNN',                   cat:{zh:'序列模型',en:'Sequence',ja:'シーケンス'},   status:false, uc:{zh:'需求預測',en:'Demand forecasting',ja:'需要予測'}},
+    {n:24, name:'LSTM',                  cat:{zh:'序列模型',en:'Sequence',ja:'シーケンス'},   status:false, uc:{zh:'時間序列預測',en:'Time-series forecasting',ja:'時系列予測'}},
+    {n:25, name:'Transformer',           cat:{zh:'序列模型',en:'Sequence',ja:'シーケンス'},   status:false, uc:{zh:'多變量預測',en:'Multivariate forecast',ja:'多変量予測'}},
+    {n:26, name:'K-Means++',             cat:{zh:'分群',en:'Clustering',ja:'クラスタリング'}, status:true, uc:{zh:'改良初始化',en:'Improved initialization',ja:'改良初期化'}},
+    {n:27, name:'Autoencoder',           cat:{zh:'異常偵測',en:'Anomaly',ja:'異常検出'},     status:true, uc:{zh:'重建誤差異常偵測',en:'Reconstruction error anomaly',ja:'再構成誤差異常検出'}},
+    {n:28, name:'Isolation Forest',      cat:{zh:'異常偵測',en:'Anomaly',ja:'異常検出'},     status:true, uc:{zh:'離群值偵測',en:'Outlier detection',ja:'外れ値検出'}},
+    {n:29, name:'MDP',                   cat:{zh:'決策過程',en:'Decision Process',ja:'決定過程'}, status:false, uc:{zh:'最佳策略建模',en:'Optimal policy modeling',ja:'最適方策モデリング'}},
+    {n:30, name:'Genetic Algorithm',     cat:{zh:'最佳化',en:'Optimization',ja:'最適化'},   status:true, uc:{zh:'安全庫存最佳化',en:'Safety stock optimization',ja:'安全在庫最適化'}},
+  ];
+
+  let html = `<p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">${t('click_enlarge')}</p>`;
+  html += `<div class="chart-gallery">${charts.map(c => chartItemHTML(c.file, c.title, c.desc)).join('')}</div>`;
+
+  // Algorithm table
+  html += `<div class="card" style="margin-top:22px"><div class="card-hd"><h3>${t('hd_algo_summary')}</h3><span class="card-badge" style="background:rgba(139,92,246,.15);color:var(--accent-purple)">30</span></div>
+    <div class="tbl-wrap"><table><thead><tr>
+      <th>${t('algo_num')}</th><th>${t('algo_name')}</th><th>${t('algo_category')}</th><th>${t('algo_status')}</th><th>${t('algo_usecase')}</th>
+    </tr></thead><tbody>`;
+  algos.forEach(a => {
+    const statusStyle = a.status
+      ? 'background:rgba(16,185,129,.15);color:var(--accent-green)'
+      : 'background:rgba(100,116,139,.15);color:var(--text-muted)';
+    html += `<tr>
+      <td style="font-weight:600;color:var(--text-muted)">${a.n}</td>
+      <td style="font-weight:600">${a.name}</td>
+      <td>${a.cat[S.lang] || a.cat.en}</td>
+      <td><span class="status-tag" style="${statusStyle}">${a.status ? t('applied') : t('not_applicable')}</span></td>
+      <td style="color:var(--text-secondary)">${a.uc[S.lang] || a.uc.en}</td>
+    </tr>`;
+  });
+  html += `</tbody></table></div></div>`;
+  return html;
+}
+
+function healthHTML() {
+  let html = `<p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">${t('click_enlarge')}</p>`;
+  html += `<div class="chart-gallery">`;
+  html += chartItemHTML('chart_0_Inventory Health & Stockout Risk.png', 'chart_0_title', 'chart_0_desc');
+  html += `</div>`;
+
+  // KPI Explanation cards
+  const kpis = [
+    {title:'kpi_dsi', desc:'kpi_dsi_desc', icon:'📅', color:'var(--accent-blue)'},
+    {title:'kpi_abc', desc:'kpi_abc_desc', icon:'🎯', color:'var(--accent-orange)'},
+    {title:'kpi_reorder', desc:'kpi_reorder_desc', icon:'🔄', color:'var(--accent-cyan)'},
+    {title:'kpi_oos', desc:'kpi_oos_desc', icon:'⚠️', color:'var(--accent-red)'},
+  ];
+  html += `<div class="card" style="margin-top:22px"><div class="card-hd"><h3>${t('hd_health_kpi')}</h3></div><div class="card-body">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">`;
+  kpis.forEach(k => {
+    html += `<div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="font-size:20px">${k.icon}</span>
+        <span style="font-weight:600;color:${k.color};font-size:14px">${t(k.title)}</span>
+      </div>
+      <p style="font-size:12px;color:var(--text-secondary);line-height:1.6">${t(k.desc)}</p>
+    </div>`;
+  });
+  html += `</div></div></div>`;
+
+  // Extra stats from data
+  if (S.data) {
+    const kpi = computeKPIs(S.data);
+    const extraStats = [
+      {l:t('stat_total_products'), v:fmt(kpi.total), c:'var(--accent-blue)'},
+      {l:t('stat_oos_rate'), v:kpi.oosRate.toFixed(1)+'%', c:'var(--accent-red)'},
+      {l:t('stat_low_stock'), v:fmt(kpi.lowCount), c:'var(--accent-yellow)'},
+      {l:t('stat_normal_stock'), v:fmt(kpi.normalCount), c:'var(--accent-green)'},
+    ];
+    html += `<div class="stats" style="margin-top:18px">${extraStats.map(i=>`<div class="stat"><div class="stat-label">${i.l}</div><div class="stat-val" style="color:${i.c}">${i.v}</div></div>`).join('')}</div>`;
+  }
+  return html;
+}
+
+// ══════════════════════
+//  Main Render
+// ══════════════════════
+function render() {
+  renderNav();
+  renderLangSwitch();
+  const info = $('#info-label');
+  if (info) info.textContent = t('data_source');
+
+  const m = $('#main');
+  let html = `<div class="main-hd"><h2>${t(TITLE_MAP[S.view]||'title_overview')}</h2><div class="hd-right"><span class="tag-static">STATIC</span><span>${localeDateStr()}</span></div></div>`;
+
+  switch (S.view) {
+    case 'overview':    html += overviewHTML(); break;
+    case 'pipeline':    html += pipelineHTML(); break;
+    case 'statistical': html += statisticalHTML(); break;
+    case 'supplychain': html += supplychainHTML(); break;
+    case 'aiml':        html += aimlHTML(); break;
+    case 'health':      html += healthHTML(); break;
+  }
+  m.innerHTML = html;
+}
+
+// ─── Boot ───
+loadData();
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+</script>
+</body>
+</html>

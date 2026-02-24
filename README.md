@@ -78,6 +78,33 @@ This project simulates a real-world supply chain scenario: a 10,000+ row invento
 
 ---
 
+## Interactive Dashboard
+
+ChainInsight includes a **single-file vanilla HTML dashboard** (`dashboard.html`) that showcases all analytics results in a polished, dark-themed interface with **trilingual i18n support (中文 / EN / 日本語)**.
+
+### Features
+
+- **6 Dashboard Views** — Overview, Data Pipeline, Statistical Analysis, Supply Chain Optimization, AI/ML Algorithms, Inventory Health
+- **Live KPI Computation** — Reads `Supply_Chain_Inventory_Clean.csv` and computes KPIs (Total Products, Categories, Vendors, Avg Unit Cost, OOS Rate, Total Inventory Value) client-side
+- **Interactive Charts** — SVG pie, bar, and donut charts rendered from CSV data; pre-generated PNG chart gallery with lightbox zoom
+- **Language Switching** — Toggle between 中文 / EN / 日本語 with all labels, titles, and descriptions fully translated; persisted in `localStorage`
+- **30-Algorithm Summary Table** — Complete overview of all ML algorithms with status, category, and supply chain use case
+- **ETL Pipeline Visualization** — Visual 8-step pipeline walkthrough with before/after statistics
+
+### How to Launch
+
+```bash
+# Option 1: Open directly in browser (charts won't load due to CORS)
+# Option 2: Serve via local HTTP server (recommended)
+cd ChainInsight
+python -m http.server 8080
+# Then open http://localhost:8080/dashboard.html
+```
+
+> **Note:** A local HTTP server is required for the CSV data fetch and chart image loading to work correctly.
+
+---
+
 ## Project Architecture
 
 ```
@@ -110,6 +137,7 @@ supply-chain-analysis/
 ├── README.md                                           # This file
 ├── LICENSE                                             # MIT License
 ├── requirements.txt                                    # Python dependencies
+├── dashboard.html                                      # Interactive dashboard (i18n: EN/JA/ZH)
 │
 ├── generate_data.py                                    # Synthetic dirty data generator
 │
@@ -528,7 +556,8 @@ The pipeline generates **23 publication-ready charts** across all analysis phase
 
 - [ ] **Deep Learning Integration** — Implement LSTM/GRU networks via TensorFlow/Keras for time-series demand forecasting
 - [ ] **Reinforcement Learning** — Q-Learning / DQN for dynamic reorder policy optimization
-- [ ] **Real-Time Dashboard** — Build interactive Streamlit/Dash dashboard for live inventory monitoring
+- [x] **Interactive Dashboard** — Vanilla HTML/JS dashboard with i18n (EN/JA/ZH), CSV-driven KPIs, and chart gallery (`dashboard.html`)
+- [ ] **Real-Time Dashboard** — Upgrade to Streamlit/Dash for live inventory monitoring with backend integration
 - [ ] **Database Backend** — Migrate from CSV to PostgreSQL/MongoDB for production-grade data storage
 - [ ] **API Service** — RESTful API (FastAPI) for serving predictions and KPIs to downstream systems
 - [ ] **Automated Alerting** — Threshold-based notifications for stockout risk and anomaly detection
