@@ -28,6 +28,8 @@
 
 - [Project Overview](#project-overview)
 - [Key Features](#key-features)
+- [React SPA (Phase 3)](#react-spa-phase-3)
+- [Interactive Dashboard](#interactive-dashboard)
 - [Project Architecture](#project-architecture)
 - [Project Structure](#project-structure)
 - [Data Schema](#data-schema)
@@ -43,7 +45,7 @@
 - [Business Insights & Findings](#business-insights--findings)
 - [Roadmap & Future Work](#roadmap--future-work)
 - [Tech Stack](#tech-stack)
-- [Bilingual Support](#bilingual-support)
+- [Language Support](#language-support)
 - [Contributing](#contributing)
 - [License](#license)
 - [Acknowledgments](#acknowledgments)
@@ -52,9 +54,9 @@
 
 ## Project Overview
 
-**ChainInsight** is a comprehensive, end-to-end supply chain inventory analytics platform that demonstrates the complete data science lifecycle — from synthetic dirty data generation, through robust ETL cleaning, to advanced statistical modeling and 30 machine learning algorithms.
+**ChainInsight** is a comprehensive, end-to-end supply chain inventory analytics platform that demonstrates the complete data science lifecycle — from synthetic dirty data generation, through robust ETL cleaning, to advanced statistical modeling, 30 machine learning algorithms, and 6 reinforcement learning agents. The platform features a modern **React 18 + TypeScript** SPA with **WebSocket real-time** pipeline monitoring, powered by a **FastAPI** backend with SQLite persistence.
 
-This project simulates a real-world supply chain scenario: a 10,000+ row inventory dataset plagued with missing values, inconsistent formats, and data quality issues. The pipeline cleans, transforms, analyzes, and visualizes this data, ultimately delivering actionable business intelligence for inventory optimization.
+This project simulates a real-world supply chain scenario: a 10,000+ row inventory dataset plagued with missing values, inconsistent formats, and data quality issues. The pipeline cleans, transforms, analyzes, and visualizes this data, ultimately delivering actionable business intelligence for inventory optimization — viewable through an interactive trilingual dashboard (EN / 中文 / 日本語).
 
 ### Why This Project?
 
@@ -62,9 +64,10 @@ This project simulates a real-world supply chain scenario: a 10,000+ row invento
 |-----------|-------------|
 | Real-world data is messy | Generate realistic dirty data with 1,280+ quality issues |
 | ETL pipelines lack transparency | 8-step documented transformation with before/after tracking |
-| Analysis often stops at EDA | Full pipeline from descriptive stats to predictive ML |
+| Analysis often stops at EDA | Full pipeline from descriptive stats → ML → RL optimization |
 | Supply chain decisions need data | Actionable KPIs: EOQ, Reorder Points, Stockout Probability |
-| Single-language barrier | Complete bilingual implementation (Chinese + English) |
+| No real-time visibility | WebSocket live progress + Watchdog auto-trigger on CSV drop |
+| Language barrier | Trilingual React UI (EN / 中文 / 日本語) + bilingual batch scripts |
 
 ---
 
