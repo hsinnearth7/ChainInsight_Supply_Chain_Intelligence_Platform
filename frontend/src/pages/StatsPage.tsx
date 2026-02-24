@@ -222,7 +222,7 @@ function computeCorrelation(data: InventoryRow[], cols: string[]): number[][] {
   const n = data.length;
   if (n < 2) return cols.map(() => cols.map(() => 0));
 
-  const vals = cols.map((c) => data.map((r) => (r as Record<string, unknown>)[c] as number || 0));
+  const vals = cols.map((c) => data.map((r) => (r as unknown as Record<string, unknown>)[c] as number || 0));
   const means = vals.map((v) => v.reduce((a, b) => a + b, 0) / n);
   const stds = vals.map((v, i) => {
     const m = means[i];
