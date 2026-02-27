@@ -812,31 +812,38 @@ class MLAnalyzer:
 
         fig = plt.figure(figsize=(24, 14), facecolor=CHART_BG_COLOR)
         fig.suptitle(
-            "Anomaly Detection — Isolation Forest & Autoencoder (MLP-based)",
+            "Anomaly Detection — Isolation Forest & Autoencoder (80/20 holdout evaluation)",
             fontsize=18, fontweight="bold", y=0.98, color=CHART_TEXT_COLOR,
         )
         gs = GridSpec(2, 3, figure=fig, hspace=0.38, wspace=0.30,
                       left=0.06, right=0.96, top=0.92, bottom=0.06)
 
-        # --- Isolation Forest ---
-        iso = IsolationForest(contamination=0.05, random_state=42, n_estimators=200)
-        iso.fit(X_scaled)
-        iso_labels = iso.predict(X_scaled)   # 1=normal, -1=anomaly
-        iso_anomaly = iso_labels == -1
-        iso_scores = iso.score_samples(X_scaled)
+        # --- Train / Test Split for fair evaluation ---
+        X_train, X_test, idx_train, idx_test = train_test_split(
+            X_scaled, np.arange(len(X_scaled)),
+            test_size=0.2, random_state=42,
+        )
+        X_2d_test = X_2d[idx_test]   # PCA coords for test set only
 
-        # (1) Isolation Forest scatter
+        # --- Isolation Forest (train on train set, evaluate on test set) ---
+        iso = IsolationForest(contamination=0.05, random_state=42, n_estimators=200)
+        iso.fit(X_train)
+        iso_labels = iso.predict(X_test)   # 1=normal, -1=anomaly
+        iso_anomaly = iso_labels == -1
+        iso_scores = iso.score_samples(X_test)
+
+        # (1) Isolation Forest scatter (test set only)
         ax1 = fig.add_subplot(gs[0, 0])
         ax1.set_facecolor(CHART_BG_COLOR)
-        ax1.scatter(X_2d[~iso_anomaly, 0], X_2d[~iso_anomaly, 1],
+        ax1.scatter(X_2d_test[~iso_anomaly, 0], X_2d_test[~iso_anomaly, 1],
                     s=3, alpha=0.2, color="#3498DB",
                     label=f"Normal ({(~iso_anomaly).sum():,})", edgecolors="none")
-        ax1.scatter(X_2d[iso_anomaly, 0], X_2d[iso_anomaly, 1],
+        ax1.scatter(X_2d_test[iso_anomaly, 0], X_2d_test[iso_anomaly, 1],
                     s=15, alpha=0.7, color="#E74C3C", marker="x",
                     label=f"Anomaly ({iso_anomaly.sum():,})")
         ax1.set_xlabel("PC1", color=CHART_TEXT_COLOR)
         ax1.set_ylabel("PC2", color=CHART_TEXT_COLOR)
-        ax1.set_title(f"Isolation Forest — {iso_anomaly.sum():,} anomalies detected",
+        ax1.set_title(f"Isolation Forest (test set) — {iso_anomaly.sum():,} anomalies detected",
                       fontsize=11, fontweight="bold", color=CHART_TEXT_COLOR)
         ax1.legend(fontsize=8)
 
@@ -855,12 +862,13 @@ class MLAnalyzer:
                       fontsize=12, fontweight="bold", color=CHART_TEXT_COLOR)
         ax2.legend(fontsize=8)
 
-        # (3) Feature comparison anomaly vs normal
+        # (3) Feature comparison anomaly vs normal (test set)
         ax3 = fig.add_subplot(gs[0, 2])
         ax3.set_facecolor(CHART_BG_COLOR)
         feat_short = ["Cost", "Stock", "Demand", "Safety", "Lead",
                       "ReOrd", "InvVal", "DSI", "CovR", "DemInt", "Cat", "Vend"]
-        df_feat = pd.DataFrame(X, columns=FEATURE_COLS)
+        X_test_orig = X[idx_test]
+        df_feat = pd.DataFrame(X_test_orig, columns=FEATURE_COLS)
         df_feat["Anomaly"] = iso_anomaly
         normal_means = df_feat[~df_feat["Anomaly"]][FEATURE_COLS].mean()
         anomaly_means = df_feat[df_feat["Anomaly"]][FEATURE_COLS].mean()
@@ -880,27 +888,27 @@ class MLAnalyzer:
                       fontsize=12, fontweight="bold", color=CHART_TEXT_COLOR)
         ax3.invert_yaxis()
 
-        # --- Autoencoder (MLP Regressor reconstructing X → X) ---
+        # --- Autoencoder (train on train set, evaluate on test set) ---
         ae = MLPRegressor(hidden_layer_sizes=(32, 8, 32), max_iter=200,
                           random_state=42, early_stopping=True, activation="relu")
-        ae.fit(X_scaled, X_scaled)
-        X_recon = ae.predict(X_scaled)
-        recon_error = np.mean((X_scaled - X_recon) ** 2, axis=1)
+        ae.fit(X_train, X_train)
+        X_recon = ae.predict(X_test)
+        recon_error = np.mean((X_test - X_recon) ** 2, axis=1)
         threshold_ae = float(np.percentile(recon_error, 95))
         ae_anomaly = recon_error > threshold_ae
 
-        # (4) Autoencoder scatter
+        # (4) Autoencoder scatter (test set only)
         ax4 = fig.add_subplot(gs[1, 0])
         ax4.set_facecolor(CHART_BG_COLOR)
-        ax4.scatter(X_2d[~ae_anomaly, 0], X_2d[~ae_anomaly, 1],
+        ax4.scatter(X_2d_test[~ae_anomaly, 0], X_2d_test[~ae_anomaly, 1],
                     s=3, alpha=0.2, color="#27AE60",
                     label=f"Normal ({(~ae_anomaly).sum():,})", edgecolors="none")
-        ax4.scatter(X_2d[ae_anomaly, 0], X_2d[ae_anomaly, 1],
+        ax4.scatter(X_2d_test[ae_anomaly, 0], X_2d_test[ae_anomaly, 1],
                     s=15, alpha=0.7, color="#E74C3C", marker="x",
                     label=f"Anomaly ({ae_anomaly.sum():,})")
         ax4.set_xlabel("PC1", color=CHART_TEXT_COLOR)
         ax4.set_ylabel("PC2", color=CHART_TEXT_COLOR)
-        ax4.set_title(f"Autoencoder (MLP) — {ae_anomaly.sum():,} anomalies (MSE > P95)",
+        ax4.set_title(f"Autoencoder (test set) — {ae_anomaly.sum():,} anomalies (MSE > P95)",
                       fontsize=11, fontweight="bold", color=CHART_TEXT_COLOR)
         ax4.legend(fontsize=8)
 
@@ -935,7 +943,7 @@ class MLAnalyzer:
         bar_cols = ["#8B0000", "#E74C3C", "#F39C12", "#27AE60"]
         bars = ax6.barh(list(venn_data.keys()), list(venn_data.values()),
                         color=bar_cols, alpha=0.82, edgecolor="white")
-        n_total = len(X)
+        n_total = len(X_test)
         for bar, val in zip(bars, venn_data.values()):
             pct = val / n_total * 100
             ax6.text(bar.get_width() + max(venn_data.values()) * 0.02,

@@ -641,36 +641,44 @@ def plot_dimensionality_reduction(X, clean_df, le_status,
 # ================================================================
 def plot_anomaly_detection(X, clean_df, feature_cols,
                            save_path='chart_20_anomaly_detection.png'):
-    """Chart 20: Anomaly detection"""
+    """Chart 20: Anomaly detection (with 80/20 holdout validation)"""
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
+    # --- Train / Test Split for fair evaluation ---
+    X_train, X_test, idx_train, idx_test = train_test_split(
+        X_scaled, np.arange(len(X_scaled)),
+        test_size=0.2, random_state=42,
+    )
+
     fig = plt.figure(figsize=(24, 14), facecolor='#F0F2F6')
-    fig.suptitle('Anomaly Detection — #28 Isolation Forest & #27 Autoencoder (MLP-based)',
+    fig.suptitle('Anomaly Detection — #28 Isolation Forest & #27 Autoencoder (80/20 holdout evaluation)',
                  fontsize=18, fontweight='bold', y=0.98, color='#1B2A4A')
     gs = GridSpec(2, 3, figure=fig, hspace=0.35, wspace=0.30,
                   left=0.06, right=0.96, top=0.92, bottom=0.06)
 
-    # -- Isolation Forest (#28) --
+    # -- Isolation Forest (#28): train on train set, evaluate on test set --
     iso = IsolationForest(contamination=0.05, random_state=42, n_estimators=200)
-    iso_labels = iso.fit_predict(X_scaled)  # 1=normal, -1=anomaly
+    iso.fit(X_train)
+    iso_labels = iso.predict(X_test)  # 1=normal, -1=anomaly
     iso_anomaly = iso_labels == -1
-    iso_scores = iso.score_samples(X_scaled)
+    iso_scores = iso.score_samples(X_test)
 
-    # PCA 2D
+    # PCA 2D (fit on all, slice test set for visualization)
     pca_2d = PCA(n_components=2)
     X_2d = pca_2d.fit_transform(X_scaled)
+    X_2d_test = X_2d[idx_test]
 
-    # (1) Isolation Forest -- scatter plot
+    # (1) Isolation Forest -- scatter plot (test set)
     ax1 = fig.add_subplot(gs[0, 0])
-    ax1.scatter(X_2d[~iso_anomaly, 0], X_2d[~iso_anomaly, 1],
+    ax1.scatter(X_2d_test[~iso_anomaly, 0], X_2d_test[~iso_anomaly, 1],
                 s=3, alpha=0.2, color='#3498DB', label=f'Normal ({(~iso_anomaly).sum():,})')
-    ax1.scatter(X_2d[iso_anomaly, 0], X_2d[iso_anomaly, 1],
+    ax1.scatter(X_2d_test[iso_anomaly, 0], X_2d_test[iso_anomaly, 1],
                 s=15, alpha=0.7, color='#E74C3C', marker='x',
                 label=f'Anomaly ({iso_anomaly.sum():,})')
     ax1.set_xlabel('PC1')
     ax1.set_ylabel('PC2')
-    ax1.set_title(f'#28 Isolation Forest — {iso_anomaly.sum():,} anomalies detected',
+    ax1.set_title(f'#28 Isolation Forest (test set) — {iso_anomaly.sum():,} anomalies detected',
                   fontsize=11, fontweight='bold')
     ax1.legend(fontsize=8)
 
@@ -687,9 +695,10 @@ def plot_anomaly_detection(X, clean_df, feature_cols,
     ax2.set_title('Isolation Forest — Score Distribution', fontsize=12, fontweight='bold')
     ax2.legend(fontsize=8)
 
-    # (3) Feature comparison: anomaly vs normal
+    # (3) Feature comparison: anomaly vs normal (test set)
     ax3 = fig.add_subplot(gs[0, 2])
-    df_feat = pd.DataFrame(X, columns=feature_cols)
+    X_test_orig = X[idx_test]
+    df_feat = pd.DataFrame(X_test_orig, columns=feature_cols)
     df_feat['Anomaly'] = iso_anomaly
     short_labels = ['Cost', 'Stock', 'Demand', 'Safety', 'Lead', 'Reorder', 'Cat', 'Vendor']
 
@@ -712,30 +721,29 @@ def plot_anomaly_detection(X, clean_df, feature_cols,
     ax3.set_title('Feature Comparison: Anomaly vs Normal', fontsize=12, fontweight='bold')
     ax3.invert_yaxis()
 
-    # -- Autoencoder (#27) -- using MLPRegressor to simulate --
+    # -- Autoencoder (#27) -- train on train set, evaluate on test set --
     from sklearn.neural_network import MLPRegressor
 
-    # Train autoencoder (input = output)
     ae = MLPRegressor(hidden_layer_sizes=(32, 8, 32), max_iter=200,
                       random_state=42, early_stopping=True, activation='relu')
-    ae.fit(X_scaled, X_scaled)
-    X_reconstructed = ae.predict(X_scaled)
-    reconstruction_error = np.mean((X_scaled - X_reconstructed) ** 2, axis=1)
+    ae.fit(X_train, X_train)
+    X_reconstructed = ae.predict(X_test)
+    reconstruction_error = np.mean((X_test - X_reconstructed) ** 2, axis=1)
 
     # Use 95th percentile as threshold
     threshold_ae = np.percentile(reconstruction_error, 95)
     ae_anomaly = reconstruction_error > threshold_ae
 
-    # (4) Autoencoder scatter plot
+    # (4) Autoencoder scatter plot (test set)
     ax4 = fig.add_subplot(gs[1, 0])
-    ax4.scatter(X_2d[~ae_anomaly, 0], X_2d[~ae_anomaly, 1],
+    ax4.scatter(X_2d_test[~ae_anomaly, 0], X_2d_test[~ae_anomaly, 1],
                 s=3, alpha=0.2, color='#27AE60', label=f'Normal ({(~ae_anomaly).sum():,})')
-    ax4.scatter(X_2d[ae_anomaly, 0], X_2d[ae_anomaly, 1],
+    ax4.scatter(X_2d_test[ae_anomaly, 0], X_2d_test[ae_anomaly, 1],
                 s=15, alpha=0.7, color='#E74C3C', marker='x',
                 label=f'Anomaly ({ae_anomaly.sum():,})')
     ax4.set_xlabel('PC1')
     ax4.set_ylabel('PC2')
-    ax4.set_title(f'#27 Autoencoder — {ae_anomaly.sum():,} anomalies (MSE > P95)',
+    ax4.set_title(f'#27 Autoencoder (test set) — {ae_anomaly.sum():,} anomalies (MSE > P95)',
                   fontsize=11, fontweight='bold')
     ax4.legend(fontsize=8)
 
@@ -769,7 +777,7 @@ def plot_anomaly_detection(X, clean_df, feature_cols,
     bars = ax6.barh(list(venn_data.keys()), list(venn_data.values()),
                     color=colors_v, alpha=0.8, edgecolor='white')
     for bar, val in zip(bars, venn_data.values()):
-        pct = val / len(X) * 100
+        pct = val / len(X_test) * 100
         ax6.text(bar.get_width() + max(venn_data.values()) * 0.02,
                  bar.get_y() + bar.get_height() / 2,
                  f'{val:,} ({pct:.1f}%)', va='center', fontsize=9, fontweight='bold')
