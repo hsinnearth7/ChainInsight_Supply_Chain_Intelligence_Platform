@@ -5,7 +5,7 @@ An agent observes the current inventory state and decides how much to reorder.
 """
 
 import logging
-from typing import Any, Optional
+from typing import Optional
 
 import gymnasium as gym
 import numpy as np

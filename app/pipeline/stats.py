@@ -4,23 +4,32 @@ import logging
 from pathlib import Path
 from typing import Optional
 
+import matplotlib
 import numpy as np
 import pandas as pd
-import matplotlib
+
 matplotlib.use("Agg")
+
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
+import seaborn as sns
 from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Patch
-import seaborn as sns
 from scipy import stats
 from scipy.stats import chi2_contingency, f_oneway, kruskal, pearsonr, spearmanr
-import warnings
 
 from app.config import (
-    CHARTS_DIR, CHART_DPI, CHART_BG_COLOR, CHART_TEXT_COLOR, STATUS_COLORS,
-    DSI_SENTINEL, ABC_THRESHOLD_A, ABC_THRESHOLD_B, SUPPLY_RISK_WEIGHTS,
-    SHAPIRO_SAMPLE_LIMIT, RISK_LEVEL_BINS, RISK_LEVEL_LABELS,
+    ABC_THRESHOLD_A,
+    ABC_THRESHOLD_B,
+    CHART_BG_COLOR,
+    CHART_DPI,
+    CHART_TEXT_COLOR,
+    CHARTS_DIR,
+    RISK_LEVEL_BINS,
+    RISK_LEVEL_LABELS,
+    SHAPIRO_SAMPLE_LIMIT,
+    STATUS_COLORS,
+    SUPPLY_RISK_WEIGHTS,
 )
 from app.pipeline.enrichment import enrich_base
 
@@ -648,7 +657,7 @@ class StatisticalAnalyzer:
         cats = sorted(cat_outliers, key=cat_outliers.get, reverse=True)
         counts = [cat_outliers[c] for c in cats]
         bars = ax2.barh(cats, counts, color=sns.color_palette("Reds_r", n_colors=len(cats)), edgecolor="white")
-        for bar, c in zip(bars, counts):
+        for bar, c in zip(bars, counts, strict=False):
             ax2.text(bar.get_width() + max(counts) * 0.02, bar.get_y() + bar.get_height() / 2,
                      str(c), va="center", fontsize=9, fontweight="bold")
         ax2.set_xlabel("Total Outliers (IQR Method)")

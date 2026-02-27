@@ -6,17 +6,18 @@ from typing import Optional
 
 import numpy as np
 
-from app.rl.environment import InventoryEnv
-from app.rl.agents.q_learning import QLearningAgent, SARSAAgent
 from app.rl.agents.hybrid_ga_rl import HybridGARLAgent
+from app.rl.agents.q_learning import QLearningAgent, SARSAAgent
+from app.rl.environment import InventoryEnv
 
 logger = logging.getLogger(__name__)
 
 # Optional deep RL agents
 try:
     import torch  # noqa: F401
+
     from app.rl.agents.dqn import DQNAgent
-    from app.rl.agents.ppo import PPOAgent, A2CAgent
+    from app.rl.agents.ppo import A2CAgent, PPOAgent
     HAS_TORCH = True
 except ImportError:
     HAS_TORCH = False
@@ -34,7 +35,7 @@ def _run_tabular_training(
     rewards_history = []
     service_levels = []
 
-    for ep in range(n_episodes):
+    for _ep in range(n_episodes):
         obs, _ = env.reset()
         total_reward = 0.0
         done = False
@@ -84,7 +85,7 @@ def _run_dqn_training(
     rewards_history = []
     service_levels = []
 
-    for ep in range(n_episodes):
+    for _ep in range(n_episodes):
         obs, _ = env.reset()
         total_reward = 0.0
         done = False
@@ -119,7 +120,7 @@ def _run_ppo_training(
     rewards_history = []
     service_levels = []
 
-    for ep in range(n_episodes):
+    for _ep in range(n_episodes):
         obs, _ = env.reset()
         total_reward = 0.0
         done = False
@@ -161,7 +162,7 @@ def _run_a2c_training(
     rewards_history = []
     service_levels = []
 
-    for ep in range(n_episodes):
+    for _ep in range(n_episodes):
         obs, _ = env.reset()
         total_reward = 0.0
         done = False

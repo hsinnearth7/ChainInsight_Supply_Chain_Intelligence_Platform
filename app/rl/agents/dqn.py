@@ -65,7 +65,7 @@ class ReplayBuffer:
             each with leading dimension equal to *batch_size*.
         """
         batch = random.sample(self._buffer, batch_size)
-        states, actions, rewards, next_states, dones = zip(*batch)
+        states, actions, rewards, next_states, dones = zip(*batch, strict=False)
         return (
             np.array(states, dtype=np.float32),
             np.array(actions, dtype=np.int64),

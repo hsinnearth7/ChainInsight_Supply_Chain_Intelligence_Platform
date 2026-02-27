@@ -4,52 +4,64 @@ import logging
 from pathlib import Path
 from typing import Optional
 
+import matplotlib
 import numpy as np
 import pandas as pd
-import matplotlib
+
 matplotlib.use("Agg")
+import warnings
+
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
-from matplotlib.gridspec import GridSpec
-from matplotlib.patches import Patch
 import seaborn as sns
-import warnings
+from matplotlib.gridspec import GridSpec
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.pipeline import Pipeline as SKPipeline
+
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
 
 # Supervised classifiers
-from sklearn.linear_model import LogisticRegression, LinearRegression
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import (
-    RandomForestClassifier, GradientBoostingClassifier, AdaBoostClassifier,
-    RandomForestRegressor, GradientBoostingRegressor,
-)
-from sklearn.svm import SVC
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.naive_bayes import GaussianNB
-from sklearn.neural_network import MLPClassifier, MLPRegressor
-
 # Unsupervised
-from sklearn.cluster import KMeans, AgglomerativeClustering, DBSCAN
+from sklearn.cluster import DBSCAN, AgglomerativeClustering, KMeans
 from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
 
 # Anomaly detection
-from sklearn.ensemble import IsolationForest
+from sklearn.ensemble import (
+    AdaBoostClassifier,
+    GradientBoostingClassifier,
+    GradientBoostingRegressor,
+    IsolationForest,
+    RandomForestClassifier,
+    RandomForestRegressor,
+)
+from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.manifold import TSNE
+from sklearn.metrics import (
+    accuracy_score,
+    confusion_matrix,
+    mean_squared_error,
+    r2_score,
+    silhouette_score,
+)
+from sklearn.model_selection import cross_val_score, train_test_split
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neural_network import MLPClassifier, MLPRegressor
 
 # Preprocessing / model selection / metrics
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.metrics import (
-    accuracy_score, confusion_matrix,
-    r2_score, mean_squared_error, silhouette_score,
-)
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
 
 from app.config import (
-    CHARTS_DIR, CHART_DPI, CHART_BG_COLOR, CHART_TEXT_COLOR,
-    GA_POPULATION, GA_GENERATIONS, GA_MUTATION_RATE, GA_CROSSOVER_RATE,
-    DSI_SENTINEL,
+    CHART_BG_COLOR,
+    CHART_DPI,
+    CHART_TEXT_COLOR,
+    CHARTS_DIR,
+    GA_CROSSOVER_RATE,
+    GA_GENERATIONS,
+    GA_MUTATION_RATE,
+    GA_POPULATION,
 )
 from app.pipeline.enrichment import enrich_base
 
@@ -239,7 +251,7 @@ class MLAnalyzer:
         bars = ax1.barh(range(len(names_s)), accs_s, color=bar_colors[::-1], edgecolor="white")
         ax1.set_yticks(range(len(names_s)))
         ax1.set_yticklabels(names_s, fontsize=8.5)
-        for bar, acc in zip(bars, accs_s):
+        for bar, acc in zip(bars, accs_s, strict=False):
             ax1.text(bar.get_width() + 0.002, bar.get_y() + bar.get_height() / 2,
                      f"{acc:.4f}", va="center", fontsize=8, fontweight="bold",
                      color=CHART_TEXT_COLOR)
@@ -255,7 +267,7 @@ class MLAnalyzer:
                  color="#3498DB", alpha=0.75, edgecolor="white", capsize=4)
         ax2.set_yticks(range(len(names_s)))
         ax2.set_yticklabels(names_s, fontsize=8.5)
-        for i, (cv, std) in enumerate(zip(cv_s, cvstd_s)):
+        for i, (cv, std) in enumerate(zip(cv_s, cvstd_s, strict=False)):
             ax2.text(cv + std + 0.004, i, f"{cv:.4f}±{std:.4f}",
                      va="center", fontsize=7.5, fontweight="bold", color=CHART_TEXT_COLOR)
         ax2.set_xlabel("5-Fold CV Accuracy")
@@ -417,7 +429,7 @@ class MLAnalyzer:
 
         colors = ["#2E86C1", "#27AE60", "#E74C3C"]
         reg_results = {}
-        for (name, reg), color in zip(regressors.items(), colors):
+        for (name, reg), color in zip(regressors.items(), colors, strict=False):
             reg.fit(X_train, y_train)
             y_pred = reg.predict(X_test)
             rmse = np.sqrt(mean_squared_error(y_test, y_pred))
@@ -461,7 +473,7 @@ class MLAnalyzer:
         reg_names = list(reg_results.keys())
         reg_colors = [reg_results[n]["color"] for n in reg_names]
         bars = ax4.barh(reg_names, r2_vals, color=reg_colors, alpha=0.82, edgecolor="white")
-        for bar, r2 in zip(bars, r2_vals):
+        for bar, r2 in zip(bars, r2_vals, strict=False):
             ax4.text(bar.get_width() + 0.008, bar.get_y() + bar.get_height() / 2,
                      f"{r2:.4f}", va="center", fontsize=10, fontweight="bold",
                      color=CHART_TEXT_COLOR)
@@ -474,7 +486,7 @@ class MLAnalyzer:
         ax5.set_facecolor(CHART_BG_COLOR)
         rmse_vals = [reg_results[n]["rmse"] for n in reg_names]
         bars = ax5.barh(reg_names, rmse_vals, color=reg_colors, alpha=0.82, edgecolor="white")
-        for bar, rmse in zip(bars, rmse_vals):
+        for bar, rmse in zip(bars, rmse_vals, strict=False):
             ax5.text(bar.get_width() + max(rmse_vals) * 0.02,
                      bar.get_y() + bar.get_height() / 2,
                      f"${rmse:,.0f}", va="center", fontsize=10, fontweight="bold",
@@ -899,7 +911,7 @@ class MLAnalyzer:
         bar_colors = ["#E74C3C" if abs(r - 1) > 0.3 else "#3498DB" for r in ratio_sorted]
         bars = ax3.barh(labels_sorted, ratio_sorted, color=bar_colors, alpha=0.82, edgecolor="white")
         ax3.axvline(1.0, color="gray", ls="--", lw=1.5)
-        for bar, r in zip(bars, ratio_sorted):
+        for bar, r in zip(bars, ratio_sorted, strict=False):
             ax3.text(bar.get_width() + 0.02, bar.get_y() + bar.get_height() / 2,
                      f"{r:.2f}x", va="center", fontsize=8, fontweight="bold",
                      color=CHART_TEXT_COLOR)
@@ -964,7 +976,7 @@ class MLAnalyzer:
         bars = ax6.barh(list(venn_data.keys()), list(venn_data.values()),
                         color=bar_cols, alpha=0.82, edgecolor="white")
         n_total = len(X_test)
-        for bar, val in zip(bars, venn_data.values()):
+        for bar, val in zip(bars, venn_data.values(), strict=False):
             pct = val / n_total * 100
             ax6.text(bar.get_width() + max(venn_data.values()) * 0.02,
                      bar.get_y() + bar.get_height() / 2,
@@ -1047,7 +1059,7 @@ class MLAnalyzer:
         avg_fitness_hist: list = []
         best_chrom_hist: list = []
 
-        for gen in range(N_GEN):
+        for _gen in range(N_GEN):
             scores = np.array([fitness(ind) for ind in population])
             best_idx = int(np.argmin(scores))
             best_fitness_hist.append(float(scores[best_idx]))
@@ -1130,7 +1142,7 @@ class MLAnalyzer:
         ax2.set_facecolor(CHART_BG_COLOR)
         bars = ax2.bar(categories, best_solution, color=cat_colors, edgecolor="white")
         ax2.axhline(1.0, color="red", ls="--", lw=1.5, label="Current baseline (1.0x)")
-        for bar, val in zip(bars, best_solution):
+        for bar, val in zip(bars, best_solution, strict=False):
             ax2.text(bar.get_x() + bar.get_width() / 2,
                      bar.get_height() + 0.03, f"{val:.2f}x",
                      ha="center", fontsize=9, fontweight="bold", color=CHART_TEXT_COLOR)

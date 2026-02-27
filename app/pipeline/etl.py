@@ -1,8 +1,7 @@
 """ETL Pipeline — 8-step data cleaning for supply chain inventory data."""
 
-import re
 import logging
-from pathlib import Path
+import re
 from typing import Optional
 
 import numpy as np
@@ -58,10 +57,10 @@ class ETLPipeline:
         logger.info("Step 0: Loading data from %s", path)
         try:
             df = pd.read_csv(path)
-        except pd.errors.EmptyDataError:
-            raise ValueError(f"CSV file is empty: {path}")
+        except pd.errors.EmptyDataError as exc:
+            raise ValueError(f"CSV file is empty: {path}") from exc
         except Exception as e:
-            raise ValueError(f"Failed to read CSV file: {e}")
+            raise ValueError(f"Failed to read CSV file: {e}") from e
         if df.empty:
             raise ValueError(f"CSV file contains no data rows: {path}")
         # Schema validation

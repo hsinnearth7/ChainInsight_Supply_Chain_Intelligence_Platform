@@ -4,22 +4,26 @@ import logging
 from pathlib import Path
 from typing import Optional
 
+import matplotlib
 import numpy as np
 import pandas as pd
-import matplotlib
+
 matplotlib.use("Agg")
+
 import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
+import seaborn as sns
 from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Patch
-import seaborn as sns
 from scipy import stats
-from scipy.stats import norm
-import warnings
 
 from app.config import (
-    CHARTS_DIR, CHART_DPI, CHART_BG_COLOR, CHART_TEXT_COLOR,
-    ORDERING_COST, HOLDING_RATE, MONTE_CARLO_SIMS, DSI_SENTINEL,
+    CHART_BG_COLOR,
+    CHART_DPI,
+    CHART_TEXT_COLOR,
+    CHARTS_DIR,
+    HOLDING_RATE,
+    MONTE_CARLO_SIMS,
+    ORDERING_COST,
 )
 from app.pipeline.enrichment import enrich_base
 
@@ -147,7 +151,7 @@ class SupplyChainAnalyzer:
         savings_by_cat = savings.groupby(valid["Category"]).sum().loc[cat_order] / 1e6
         bars = ax6.barh(savings_by_cat.index, savings_by_cat.values,
                         color=sns.color_palette("YlOrRd_r", len(savings_by_cat)), edgecolor="white")
-        for bar, val in zip(bars, savings_by_cat.values):
+        for bar, val in zip(bars, savings_by_cat.values, strict=False):
             ax6.text(bar.get_width() + savings_by_cat.max() * 0.02,
                      bar.get_y() + bar.get_height() / 2,
                      f"${val:.2f}M", va="center", fontsize=9, fontweight="bold")
@@ -278,7 +282,7 @@ class SupplyChainAnalyzer:
                 inner_colors.append(vendor_palette[vendor_list.index(vendor)])
         wedges1, _ = ax2.pie(cat_val.values, radius=1.1, colors=colors_tree,
                              wedgeprops=dict(width=0.35, edgecolor="white", linewidth=2), startangle=90)
-        for i, (w, cat) in enumerate(zip(wedges1, cat_order)):
+        for _i, (w, cat) in enumerate(zip(wedges1, cat_order, strict=False)):
             ang = (w.theta2 + w.theta1) / 2
             x, y = 1.3 * np.cos(np.radians(ang)), 1.3 * np.sin(np.radians(ang))
             ax2.text(x, y, cat, ha="center", va="center", fontsize=8, fontweight="bold")
@@ -407,7 +411,7 @@ class SupplyChainAnalyzer:
         ax4.set_xticklabels(replen_by_cat.index, rotation=30, ha="right", fontsize=8)
         ax4.set_ylabel("Est. Replenishment Cost ($M)")
         ax4.set_title("Replenishment Budget by Category", fontsize=12, fontweight="bold")
-        for i, (bar, count) in enumerate(zip(bars, replen_by_cat["SKU_Count"])):
+        for _i, (bar, count) in enumerate(zip(bars, replen_by_cat["SKU_Count"], strict=False)):
             ax4.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
                      f"{count} SKUs", ha="center", va="bottom", fontsize=8, fontweight="bold")
 
@@ -440,7 +444,7 @@ class SupplyChainAnalyzer:
         ax1 = fig.add_subplot(gs[0, 0])
         bars = ax1.barh(cat_stats.index, cat_stats["CV"],
                         color=sns.color_palette("YlOrRd", len(cat_stats)), edgecolor="white")
-        for bar, cv in zip(bars, cat_stats["CV"]):
+        for bar, cv in zip(bars, cat_stats["CV"], strict=False):
             ax1.text(bar.get_width() + 0.005, bar.get_y() + bar.get_height() / 2,
                      f"{cv:.3f}", va="center", fontsize=9, fontweight="bold")
         ax1.set_xlabel("Coefficient of Variation")
@@ -456,10 +460,10 @@ class SupplyChainAnalyzer:
             ("<0.5x (Critical)", ((df["Stock_Coverage_Ratio"] > 0) & (df["Stock_Coverage_Ratio"] <= 0.5)).sum()),
             ("Zero Stock", (df["Current_Stock"] == 0).sum()),
         ]
-        labels_f, counts = zip(*levels)
+        labels_f, counts = zip(*levels, strict=False)
         colors_f = ["#27AE60", "#82E0AA", "#F9E79F", "#F5B041", "#E74C3C", "#8B0000"]
         total_skus = len(df)
-        for i, (label, count, color) in enumerate(zip(labels_f, counts, colors_f)):
+        for i, (label, count, color) in enumerate(zip(labels_f, counts, colors_f, strict=False)):
             ax2.barh(i, count, color=color, edgecolor="white", height=0.7)
             ax2.text(count + max(counts) * 0.02, i,
                      f"{count:,} ({count/total_skus*100:.1f}%)", va="center", fontsize=8, fontweight="bold")

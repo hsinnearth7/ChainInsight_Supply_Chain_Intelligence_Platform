@@ -1,13 +1,12 @@
 """Watchdog file monitor — watches data/raw/ for new CSV files and triggers pipelines."""
 
 import logging
-import time
 import threading
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable
 
+from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler, FileCreatedEvent
 
 logger = logging.getLogger(__name__)
 

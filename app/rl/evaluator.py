@@ -4,11 +4,12 @@ import logging
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from app.config import CHART_DPI, CHART_BG_COLOR, CHART_TEXT_COLOR, COLOR_PALETTE
+from app.config import CHART_BG_COLOR, CHART_DPI, CHART_TEXT_COLOR, COLOR_PALETTE
 
 logger = logging.getLogger(__name__)
 
