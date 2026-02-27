@@ -45,7 +45,8 @@ class ConnectionManager:
         for ws in self._batch.get(batch_id, []):
             try:
                 await ws.send_text(data)
-            except Exception:
+            except Exception as exc:
+                logger.warning("Failed to send WS message to batch %s: %s", batch_id, exc)
                 dead.append(ws)
         for ws in dead:
             self.disconnect(ws, batch_id)
@@ -58,7 +59,8 @@ class ConnectionManager:
         for ws in self._global:
             try:
                 await ws.send_text(data)
-            except Exception:
+            except Exception as exc:
+                logger.warning("Failed to send global WS message: %s", exc)
                 dead.append(ws)
         for ws in dead:
             self.disconnect(ws)

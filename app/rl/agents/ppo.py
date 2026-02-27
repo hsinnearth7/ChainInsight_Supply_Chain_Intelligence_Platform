@@ -237,7 +237,10 @@ class RolloutBuffer:
 # ---------------------------------------------------------------------------
 
 
-class PPOAgent:
+from app.rl.agents.base import BasePolicyAgent
+
+
+class PPOAgent(BasePolicyAgent):
     """Proximal Policy Optimization (clip variant).
 
     Reference: Schulman et al., "Proximal Policy Optimization Algorithms", 2017.
@@ -495,7 +498,7 @@ class PPOAgent:
 # ---------------------------------------------------------------------------
 
 
-class A2CAgent:
+class A2CAgent(BasePolicyAgent):
     """Advantage Actor-Critic (A2C) — synchronous, single-step updates.
 
     Unlike PPO, A2C performs a single gradient step per update without

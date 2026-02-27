@@ -47,7 +47,7 @@ def _run_tabular_training(
                 next_obs, reward, terminated, truncated, info = env.step(action)
                 done = terminated or truncated
                 next_action = agent.select_action(next_obs)
-                agent.update(obs, action, reward, next_obs, next_action, done)
+                agent.update(obs, action, reward, next_obs, done, next_action=next_action)
                 obs = next_obs
                 action = next_action
             else:
@@ -200,14 +200,29 @@ class RLTrainer:
         n_episodes: int = 300,
         episode_length: int = 90,
         env_kwargs: Optional[dict] = None,
+        seed: int = 42,
+        convergence_window: int = 20,
+        convergence_threshold: float = 0.05,
     ):
         self.n_episodes = n_episodes
         self.episode_length = episode_length
         self.env_kwargs = env_kwargs or {}
         self.results: dict[str, dict] = {}
+        self.seed = seed
+        self.convergence_window = convergence_window
+        self.convergence_threshold = convergence_threshold
 
-    def _make_env(self) -> InventoryEnv:
-        return InventoryEnv(episode_length=self.episode_length, **self.env_kwargs)
+        # Set global seeds for reproducibility
+        np.random.seed(seed)
+        if HAS_TORCH:
+            torch.manual_seed(seed)
+
+    def _make_env(self, offset: int = 0) -> InventoryEnv:
+        return InventoryEnv(
+            episode_length=self.episode_length,
+            seed=self.seed + offset,
+            **self.env_kwargs,
+        )
 
     def train_all(self, on_progress=None) -> dict[str, dict]:
         """Train all available agents and return results dict."""
@@ -224,7 +239,7 @@ class RLTrainer:
 
         # --- Tabular agents ---
         t0 = time.time()
-        env = self._make_env()
+        env = self._make_env(offset=0)
         q_agent = QLearningAgent()
         self.results["Q-Learning"] = _run_tabular_training(
             q_agent, env, self.n_episodes, "Q-Learning"
@@ -232,7 +247,7 @@ class RLTrainer:
         _report("Q-Learning", f"done in {time.time()-t0:.1f}s")
 
         t0 = time.time()
-        env = self._make_env()
+        env = self._make_env(offset=1)
         sarsa_agent = SARSAAgent()
         self.results["SARSA"] = _run_tabular_training(
             sarsa_agent, env, self.n_episodes, "SARSA", is_sarsa=True
@@ -241,7 +256,7 @@ class RLTrainer:
 
         # --- GA-RL Hybrid ---
         t0 = time.time()
-        env = self._make_env()
+        env = self._make_env(offset=2)
         hybrid_agent = HybridGARLAgent()
         hybrid_agent.initialize_from_ga(env)
         hybrid_result = _run_tabular_training(
@@ -254,19 +269,19 @@ class RLTrainer:
         # --- Deep RL agents (require PyTorch) ---
         if HAS_TORCH:
             t0 = time.time()
-            env = self._make_env()
+            env = self._make_env(offset=3)
             dqn_agent = DQNAgent()
             self.results["DQN"] = _run_dqn_training(dqn_agent, env, self.n_episodes)
             _report("DQN", f"done in {time.time()-t0:.1f}s")
 
             t0 = time.time()
-            env = self._make_env()
+            env = self._make_env(offset=4)
             ppo_agent = PPOAgent()
             self.results["PPO"] = _run_ppo_training(ppo_agent, env, self.n_episodes)
             _report("PPO", f"done in {time.time()-t0:.1f}s")
 
             t0 = time.time()
-            env = self._make_env()
+            env = self._make_env(offset=5)
             a2c_agent = A2CAgent()
             self.results["A2C"] = _run_a2c_training(a2c_agent, env, self.n_episodes)
             _report("A2C", f"done in {time.time()-t0:.1f}s")

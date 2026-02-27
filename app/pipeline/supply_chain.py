@@ -16,12 +16,12 @@ import seaborn as sns
 from scipy import stats
 from scipy.stats import norm
 import warnings
-warnings.filterwarnings("ignore")
 
 from app.config import (
     CHARTS_DIR, CHART_DPI, CHART_BG_COLOR, CHART_TEXT_COLOR,
-    ORDERING_COST, HOLDING_RATE, MONTE_CARLO_SIMS,
+    ORDERING_COST, HOLDING_RATE, MONTE_CARLO_SIMS, DSI_SENTINEL,
 )
+from app.pipeline.enrichment import enrich_base
 
 logger = logging.getLogger(__name__)
 
@@ -37,13 +37,8 @@ class SupplyChainAnalyzer:
 
     def enrich(self, df: pd.DataFrame) -> pd.DataFrame:
         """Add supply-chain specific derived columns."""
-        df = df.copy()
-        df["DSI"] = np.where(df["Daily_Demand_Est"] > 0,
-                             df["Current_Stock"] / df["Daily_Demand_Est"], 999)
+        df = enrich_base(df)
         df["Annual_Demand"] = df["Daily_Demand_Est"] * 365
-        df["Stock_Coverage_Ratio"] = np.where(
-            df["Safety_Stock_Target"] > 0,
-            df["Current_Stock"] / df["Safety_Stock_Target"], 0)
         df["Reorder_Gap"] = df["Current_Stock"] - df["Reorder_Point"]
         df["Holding_Cost"] = df["Unit_Cost"] * HOLDING_RATE
         df["EOQ"] = np.where(
@@ -258,12 +253,7 @@ class SupplyChainAnalyzer:
         fig.suptitle("Inventory Value Composition — Treemap & Sunburst View",
                      fontsize=18, fontweight="bold", y=1.0, color=CHART_TEXT_COLOR)
 
-        try:
-            import squarify
-        except ImportError:
-            import subprocess, sys
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "squarify", "-q"])
-            import squarify
+        import squarify
 
         cat_val = df.groupby("Category")["Inventory_Value"].sum().sort_values(ascending=False)
         total = cat_val.sum()

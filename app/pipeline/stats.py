@@ -16,9 +16,13 @@ import seaborn as sns
 from scipy import stats
 from scipy.stats import chi2_contingency, f_oneway, kruskal, pearsonr, spearmanr
 import warnings
-warnings.filterwarnings("ignore")
 
-from app.config import CHARTS_DIR, CHART_DPI, CHART_BG_COLOR, CHART_TEXT_COLOR, STATUS_COLORS
+from app.config import (
+    CHARTS_DIR, CHART_DPI, CHART_BG_COLOR, CHART_TEXT_COLOR, STATUS_COLORS,
+    DSI_SENTINEL, ABC_THRESHOLD_A, ABC_THRESHOLD_B, SUPPLY_RISK_WEIGHTS,
+    SHAPIRO_SAMPLE_LIMIT, RISK_LEVEL_BINS, RISK_LEVEL_LABELS,
+)
+from app.pipeline.enrichment import enrich_base
 
 logger = logging.getLogger(__name__)
 
@@ -34,22 +38,12 @@ class StatisticalAnalyzer:
 
     def enrich(self, df: pd.DataFrame) -> pd.DataFrame:
         """Add derived columns needed for statistical analysis."""
-        df = df.copy()
-        df["DSI"] = np.where(
-            df["Daily_Demand_Est"] > 0,
-            df["Current_Stock"] / df["Daily_Demand_Est"],
-            999,
-        )
-        df["Stock_Coverage_Ratio"] = np.where(
-            df["Safety_Stock_Target"] > 0,
-            df["Current_Stock"] / df["Safety_Stock_Target"],
-            0,
-        )
-        df["Demand_Intensity"] = df["Daily_Demand_Est"] * df["Unit_Cost"]
+        df = enrich_base(df)
+        w_lt, w_cov, w_demand = SUPPLY_RISK_WEIGHTS
         df["Supply_Risk_Score"] = (
-            df["Lead_Time_Days"] / df["Lead_Time_Days"].max() * 0.4
-            + (1 - df["Stock_Coverage_Ratio"].clip(0, 3) / 3) * 0.4
-            + df["Daily_Demand_Est"] / df["Daily_Demand_Est"].max() * 0.2
+            df["Lead_Time_Days"] / df["Lead_Time_Days"].max() * w_lt
+            + (1 - df["Stock_Coverage_Ratio"].clip(0, 3) / 3) * w_cov
+            + df["Daily_Demand_Est"] / df["Daily_Demand_Est"].max() * w_demand
         )
         return df
 
@@ -70,8 +64,8 @@ class StatisticalAnalyzer:
         total_value = df_sorted["Inventory_Value"].sum()
         df_sorted["Cumulative_Pct"] = df_sorted["Inventory_Value"].cumsum() / total_value * 100
         df_sorted["ABC_Class"] = np.where(
-            df_sorted["Cumulative_Pct"] <= 80, "A",
-            np.where(df_sorted["Cumulative_Pct"] <= 95, "B", "C"),
+            df_sorted["Cumulative_Pct"] <= ABC_THRESHOLD_A, "A",
+            np.where(df_sorted["Cumulative_Pct"] <= ABC_THRESHOLD_B, "B", "C"),
         )
         df = df.merge(df_sorted[["Product_ID", "ABC_Class"]], on="Product_ID", how="left")
         return df
@@ -352,7 +346,7 @@ class StatisticalAnalyzer:
             ax_hist.set_ylabel("Density")
             skew_val = data.skew()
             kurt_val = data.kurtosis()
-            _, shapiro_p = stats.shapiro(data.sample(min(500, len(data)), random_state=42))
+            _, shapiro_p = stats.shapiro(data.sample(min(SHAPIRO_SAMPLE_LIMIT, len(data)), random_state=42))
             stat_text = (f"n={len(data):,}\nmean={data.mean():.1f}\nstd={data.std():.1f}\n"
                          f"skew={skew_val:.2f}\nkurt={kurt_val:.2f}\nShapiro p={shapiro_p:.4f}")
             ax_hist.text(0.97, 0.95, stat_text, transform=ax_hist.transAxes, fontsize=7,
@@ -681,8 +675,8 @@ class StatisticalAnalyzer:
         ax4 = fig.add_subplot(gs[1, 1])
         df_risk = df.copy()
         df_risk["Risk_Level"] = pd.cut(df_risk["Supply_Risk_Score"],
-                                        bins=[0, 0.3, 0.5, 0.7, 1.0],
-                                        labels=["Low", "Medium", "High", "Critical"])
+                                        bins=RISK_LEVEL_BINS,
+                                        labels=RISK_LEVEL_LABELS)
         risk_cat = pd.crosstab(df_risk["Risk_Level"], df_risk["Category"])
         risk_cat.plot(kind="bar", stacked=True, ax=ax4, colormap="Set2", edgecolor="white", linewidth=0.5)
         ax4.set_xlabel("Risk Level")

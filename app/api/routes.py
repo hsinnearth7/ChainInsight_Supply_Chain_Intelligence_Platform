@@ -1,40 +1,81 @@
 """FastAPI routes — REST API for pipeline execution and results retrieval."""
 
 import asyncio
+import io
 import json
-import shutil
 import logging
+import re
+import time
 import uuid
+from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+import pandas as pd
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from app.config import RAW_DIR, CHARTS_DIR
-from app.db.models import get_db, SessionLocal, PipelineRun, AnalysisResult, InventorySnapshot
+from app.auth import require_api_key
+from app.config import CHARTS_DIR, MAX_UPLOAD_SIZE, RATE_LIMIT_PER_MINUTE, RAW_DIR
+from app.db.models import AnalysisResult, InventorySnapshot, PipelineRun, SessionLocal, get_db
 from app.pipeline.orchestrator import PipelineOrchestrator
 from app.ws.manager import manager
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api", tags=["pipeline"])
+router = APIRouter(prefix="/api", tags=["pipeline"], dependencies=[Depends(require_api_key)])
+
+
+# ---------- Helpers ----------
+
+def _safe_filename(filename: str) -> str:
+    """Sanitize a filename: strip path components and dangerous characters."""
+    # Take only the basename (strip directory traversal)
+    name = Path(filename).name
+    # Remove any remaining path separators and null bytes
+    name = re.sub(r'[/\\:\x00]', '', name)
+    # Strip leading dots to prevent hidden files
+    name = name.lstrip('.')
+    if not name:
+        name = "upload.csv"
+    return f"{uuid.uuid4().hex[:8]}_{name}"
+
+
+def _safe_path(base: Path, *parts: str) -> Path:
+    """Resolve path and ensure it stays within base directory."""
+    resolved = (base / Path(*parts)).resolve()
+    if not resolved.is_relative_to(base.resolve()):
+        raise HTTPException(403, "Access denied")
+    return resolved
+
+
+# ---------- Rate limiter ----------
+
+_rate_limit_store: dict[str, list[float]] = defaultdict(list)
+
+
+def _check_rate_limit(request: Request):
+    """Simple in-memory rate limiter per client IP."""
+    client_ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    window_start = now - 60.0
+    # Clean old entries
+    _rate_limit_store[client_ip] = [
+        t for t in _rate_limit_store[client_ip] if t > window_start
+    ]
+    if len(_rate_limit_store[client_ip]) >= RATE_LIMIT_PER_MINUTE:
+        raise HTTPException(429, "Rate limit exceeded. Try again later.")
+    _rate_limit_store[client_ip].append(now)
 
 
 # ---------- Progress bridge: sync pipeline thread -> async WS ----------
 
 def _make_ws_progress_callback(batch_id: str, loop: asyncio.AbstractEventLoop):
-    """Create a sync callback that bridges to async WS broadcast.
-
-    The pipeline runs in a thread via asyncio.to_thread(). This callback
-    uses run_coroutine_threadsafe to push messages to the WS event loop.
-    """
+    """Create a sync callback that bridges to async WS broadcast."""
     stage_index = {s: i for i, s in enumerate(PipelineOrchestrator.STAGES)}
     total = len(PipelineOrchestrator.STAGES)
 
     def callback(stage: str, status: str, data: dict = None):
-        # RL trainer calls with 2 args (stage, message_string), normalize it
         if data is None and isinstance(status, str) and status not in ("running", "completed", "failed"):
             data = {"message": status}
             status = "running"
@@ -49,7 +90,8 @@ def _make_ws_progress_callback(batch_id: str, loop: asyncio.AbstractEventLoop):
 
         msg_type = "pipeline:failed" if status == "failed" else f"pipeline:{status}"
         if status in ("running", "completed"):
-            msg_type = f"pipeline:{'progress' if status == 'running' else 'completed' if idx == total - 1 and status == 'completed' else 'progress'}"
+            is_final = idx == total - 1 and status == "completed"
+            msg_type = f"pipeline:{'completed' if is_final else 'progress'}"
 
         msg = manager.build_message(
             msg_type=msg_type,
@@ -78,22 +120,37 @@ def _safe_serialize(obj):
 # ---------- Ingest (non-blocking) ----------
 
 @router.post("/ingest")
-async def ingest_csv(file: UploadFile = File(...)):
+async def ingest_csv(request: Request, file: UploadFile = File(...)):
     """Upload a CSV file and trigger the full analysis pipeline (non-blocking)."""
-    if not file.filename.endswith(".csv"):
+    _check_rate_limit(request)
+
+    if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(400, "Only CSV files are accepted")
 
-    # Save uploaded file
-    raw_path = RAW_DIR / file.filename
-    with open(raw_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
-    logger.info("File uploaded: %s", raw_path)
+    # Read and validate size
+    contents = await file.read()
+    if len(contents) > MAX_UPLOAD_SIZE:
+        raise HTTPException(413, f"File too large. Max {MAX_UPLOAD_SIZE // 1024 // 1024}MB")
+
+    # Validate it's actually CSV with data
+    try:
+        test_df = pd.read_csv(io.BytesIO(contents), nrows=1)
+        if test_df.empty or len(test_df.columns) < 2:
+            raise ValueError("CSV must have at least 2 columns and 1 data row")
+    except Exception as exc:
+        raise HTTPException(400, "Invalid CSV file") from exc
+
+    # Save with sanitized filename
+    safe_name = _safe_filename(file.filename)
+    raw_path = RAW_DIR / safe_name
+    raw_path.write_bytes(contents)
+    logger.info("File uploaded: %s", raw_path.name)
 
     # Create batch ID and queued pipeline run record
     batch_id = f"batch_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
     db = SessionLocal()
     try:
-        run_record = PipelineRun(batch_id=batch_id, status="queued", source_file=str(raw_path))
+        run_record = PipelineRun(batch_id=batch_id, status="queued", source_file=safe_name)
         db.add(run_record)
         db.commit()
     finally:
@@ -108,25 +165,30 @@ async def ingest_csv(file: UploadFile = File(...)):
         asyncio.to_thread(orchestrator.run, str(raw_path), batch_id)
     )
 
-    return {"batch_id": batch_id, "status": "queued", "message": "Pipeline started. Connect to WS for real-time progress."}
+    return {
+        "batch_id": batch_id,
+        "status": "queued",
+        "message": "Pipeline started. Connect to WS for real-time progress.",
+    }
 
 
 @router.post("/ingest/existing")
-async def ingest_existing():
+async def ingest_existing(request: Request):
     """Trigger pipeline using an existing CSV file in data/raw/."""
-    # Find the dirty CSV file
+    _check_rate_limit(request)
+
     candidates = list(RAW_DIR.glob("*Dirty*.csv")) + list(RAW_DIR.glob("*dirty*.csv"))
     if not candidates:
         raise HTTPException(404, "No existing dirty CSV found in data/raw/")
     raw_path = candidates[0]
     if raw_path.stat().st_size == 0:
         raise HTTPException(400, f"File {raw_path.name} is empty (0 bytes)")
-    logger.info("Using existing file: %s", raw_path)
+    logger.info("Using existing file: %s", raw_path.name)
 
     batch_id = f"batch_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
     db = SessionLocal()
     try:
-        run_record = PipelineRun(batch_id=batch_id, status="queued", source_file=str(raw_path))
+        run_record = PipelineRun(batch_id=batch_id, status="queued", source_file=raw_path.name)
         db.add(run_record)
         db.commit()
     finally:
@@ -146,20 +208,20 @@ async def ingest_existing():
 async def trigger_pipeline_from_path(file_path: str):
     """Trigger a pipeline run from a file path (called by watchdog)."""
     batch_id = f"batch_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
+    safe_name = Path(file_path).name
     db = SessionLocal()
     try:
-        run_record = PipelineRun(batch_id=batch_id, status="queued", source_file=file_path)
+        run_record = PipelineRun(batch_id=batch_id, status="queued", source_file=safe_name)
         db.add(run_record)
         db.commit()
     finally:
         db.close()
 
-    # Broadcast watchdog detection
     await manager.broadcast_global(
         manager.build_message(
             msg_type="watchdog:detected",
             batch_id=batch_id,
-            data={"file": file_path},
+            data={"file": safe_name},
         )
     )
 
@@ -181,7 +243,6 @@ def get_run_status(batch_id: str, db: Session = Depends(get_db)):
     if not run:
         raise HTTPException(404, "Run not found")
 
-    # Determine current stage from analysis results
     analyses = db.query(AnalysisResult).filter(AnalysisResult.batch_id == batch_id).all()
     completed_stages = [a.analysis_type for a in analyses]
     all_stages = PipelineOrchestrator.STAGES
@@ -252,7 +313,7 @@ def get_inventory_data(batch_id: str, db: Session = Depends(get_db)):
     ]
 
 
-# ---------- Existing endpoints (unchanged) ----------
+# ---------- Existing endpoints ----------
 
 @router.get("/runs")
 def list_runs(db: Session = Depends(get_db)):
@@ -314,17 +375,17 @@ def get_kpis(batch_id: str, db: Session = Depends(get_db)):
 @router.get("/runs/{batch_id}/charts")
 def list_charts(batch_id: str):
     """List all chart files for a batch."""
-    charts_dir = CHARTS_DIR / batch_id
+    charts_dir = _safe_path(CHARTS_DIR, batch_id)
     if not charts_dir.exists():
         raise HTTPException(404, "Charts directory not found")
     charts = sorted(charts_dir.glob("*.png"))
-    return [{"name": c.name, "path": str(c)} for c in charts]
+    return [{"name": c.name, "path": c.name} for c in charts]
 
 
 @router.get("/runs/{batch_id}/charts/{chart_name}")
 def get_chart(batch_id: str, chart_name: str):
     """Serve a specific chart image."""
-    chart_path = CHARTS_DIR / batch_id / chart_name
+    chart_path = _safe_path(CHARTS_DIR, batch_id, chart_name)
     if not chart_path.exists():
         raise HTTPException(404, "Chart not found")
     return FileResponse(str(chart_path), media_type="image/png")

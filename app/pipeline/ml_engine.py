@@ -14,7 +14,9 @@ from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Patch
 import seaborn as sns
 import warnings
-warnings.filterwarnings("ignore")
+from sklearn.exceptions import ConvergenceWarning
+from sklearn.pipeline import Pipeline as SKPipeline
+warnings.filterwarnings("ignore", category=ConvergenceWarning)
 
 # Supervised classifiers
 from sklearn.linear_model import LogisticRegression, LinearRegression
@@ -47,17 +49,26 @@ from sklearn.metrics import (
 from app.config import (
     CHARTS_DIR, CHART_DPI, CHART_BG_COLOR, CHART_TEXT_COLOR,
     GA_POPULATION, GA_GENERATIONS, GA_MUTATION_RATE, GA_CROSSOVER_RATE,
+    DSI_SENTINEL,
 )
+from app.pipeline.enrichment import enrich_base
 
 logger = logging.getLogger(__name__)
 
-# Feature columns used for ML models
-FEATURE_COLS = [
+# Classification features — exclude circular predictors that encode the target
+CLASSIFICATION_FEATURES = [
     "Unit_Cost", "Current_Stock", "Daily_Demand_Est",
-    "Safety_Stock_Target", "Lead_Time_Days", "Reorder_Point",
-    "Inventory_Value", "DSI", "Stock_Coverage_Ratio", "Demand_Intensity",
-    "Category_Enc", "Vendor_Enc",
+    "Safety_Stock_Target", "Lead_Time_Days",
+    "Demand_Intensity", "Category_Enc", "Vendor_Enc",
 ]
+
+# Regression features — can include derived columns for value prediction
+REGRESSION_FEATURES = CLASSIFICATION_FEATURES + [
+    "Reorder_Point", "DSI", "Stock_Coverage_Ratio",
+]
+
+# All feature columns (for clustering/dimensionality reduction)
+FEATURE_COLS = REGRESSION_FEATURES + ["Inventory_Value"]
 
 
 class MLAnalyzer:
@@ -75,19 +86,7 @@ class MLAnalyzer:
 
     def enrich(self, df: pd.DataFrame) -> pd.DataFrame:
         """Add DSI, Stock_Coverage_Ratio, Demand_Intensity and label-encoded columns."""
-        df = df.copy()
-
-        df["DSI"] = np.where(
-            df["Daily_Demand_Est"] > 0,
-            df["Current_Stock"] / df["Daily_Demand_Est"],
-            999,
-        )
-        df["Stock_Coverage_Ratio"] = np.where(
-            df["Safety_Stock_Target"] > 0,
-            df["Current_Stock"] / df["Safety_Stock_Target"],
-            0,
-        )
-        df["Demand_Intensity"] = df["Daily_Demand_Est"] * df["Unit_Cost"]
+        df = enrich_base(df)
 
         le_cat = LabelEncoder()
         df["Category_Enc"] = le_cat.fit_transform(df["Category"].astype(str))
@@ -105,8 +104,22 @@ class MLAnalyzer:
 
         return df
 
+    def _prepare_classification_arrays(self, df: pd.DataFrame):
+        """Return (clean_df, X, y_class) for classification tasks."""
+        clean = df.dropna(subset=CLASSIFICATION_FEATURES + ["Stock_Status_Enc"]).copy()
+        X = clean[CLASSIFICATION_FEATURES].values
+        y_class = clean["Stock_Status_Enc"].values
+        return clean, X, y_class
+
+    def _prepare_regression_arrays(self, df: pd.DataFrame):
+        """Return (clean_df, X, y_reg) for regression tasks."""
+        clean = df.dropna(subset=REGRESSION_FEATURES + ["Inventory_Value"]).copy()
+        X = clean[REGRESSION_FEATURES].values
+        y_reg = clean["Inventory_Value"].values
+        return clean, X, y_reg
+
     def _prepare_arrays(self, df: pd.DataFrame):
-        """Return (clean_df, X, y_class, y_reg) after dropping NaN rows."""
+        """Return (clean_df, X, y_class, y_reg) for clustering/DR tasks."""
         clean = df.dropna(subset=FEATURE_COLS + ["Stock_Status_Enc"]).copy()
         X = clean[FEATURE_COLS].values
         y_class = clean["Stock_Status_Enc"].values
@@ -143,13 +156,17 @@ class MLAnalyzer:
     def plot_classification(self, df: pd.DataFrame) -> str:
         """Chart 15: Compare 9 classifiers on Stock_Status prediction."""
         logger.info("chart_15: classification comparison")
-        clean, X, y_class, _ = self._prepare_arrays(df)
+        clean, X, y_class = self._prepare_classification_arrays(df)
 
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
+        # Split BEFORE scaling to prevent data leakage
         X_train, X_test, y_train, y_test = train_test_split(
-            X_scaled, y_class, test_size=0.2, random_state=42, stratify=y_class
+            X, y_class, test_size=0.2, random_state=42, stratify=y_class
         )
+
+        # Fit scaler only on training data
+        scaler = StandardScaler()
+        X_train_scaled = scaler.fit_transform(X_train)
+        X_test_scaled = scaler.transform(X_test)
 
         classifiers = {
             "Logistic Regression": LogisticRegression(max_iter=1000, random_state=42),
@@ -169,10 +186,15 @@ class MLAnalyzer:
         clf_results = {}
         trained_models = {}
         for name, clf in classifiers.items():
-            clf.fit(X_train, y_train)
-            y_pred = clf.predict(X_test)
+            # Use sklearn Pipeline for CV to prevent scaler leakage
+            pipe = SKPipeline([("scaler", StandardScaler()), ("clf", clf)])
+            cv_scores = cross_val_score(pipe, X, y_class, cv=5, scoring="accuracy")
+
+            # Train on scaled train set for test accuracy
+            clf.fit(X_train_scaled, y_train)
+            y_pred = clf.predict(X_test_scaled)
             acc = accuracy_score(y_test, y_pred)
-            cv_scores = cross_val_score(clf, X_scaled, y_class, cv=5, scoring="accuracy")
+
             clf_results[name] = {
                 "accuracy": acc,
                 "cv_mean": cv_scores.mean(),
@@ -185,10 +207,10 @@ class MLAnalyzer:
         # Store for use by plot_feature_importance
         self._clf_results = clf_results
         self._trained_models = trained_models
-        self._X_scaled_cls = X_scaled
         self._y_class = y_class
         self._y_test_cls = y_test
         self._scaler_cls = scaler
+        self._classification_features = CLASSIFICATION_FEATURES
         self.results["classification"] = {k: {kk: vv for kk, vv in v.items() if kk != "y_pred"}
                                            for k, v in clf_results.items()}
 
@@ -294,15 +316,15 @@ class MLAnalyzer:
     def plot_feature_importance(self, df: pd.DataFrame) -> str:
         """Chart 16: RF, GB, DT feature importances + LR coefficient magnitudes."""
         logger.info("chart_16: feature importance")
-        clean, X, y_class, _ = self._prepare_arrays(df)
+        clean, X, y_class = self._prepare_classification_arrays(df)
 
         # Re-train fresh models if classification wasn't run yet
         if not hasattr(self, "_trained_models"):
-            scaler = StandardScaler()
-            X_scaled = scaler.fit_transform(X)
             X_train, X_test, y_train, y_test = train_test_split(
-                X_scaled, y_class, test_size=0.2, random_state=42, stratify=y_class
+                X, y_class, test_size=0.2, random_state=42, stratify=y_class
             )
+            scaler = StandardScaler()
+            X_train_scaled = scaler.fit_transform(X_train)
             models = {
                 "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42),
                 "Gradient Boosting": GradientBoostingClassifier(n_estimators=100, random_state=42),
@@ -310,16 +332,12 @@ class MLAnalyzer:
                 "Logistic Regression": LogisticRegression(max_iter=1000, random_state=42),
             }
             for m in models.values():
-                m.fit(X_train, y_train)
+                m.fit(X_train_scaled, y_train)
             self._trained_models = models
-        else:
-            scaler = self._scaler_cls
-            X_scaled = self._X_scaled_cls
 
         feature_labels = [
             "Unit Cost", "Curr. Stock", "Daily Demand", "Safety Stock",
-            "Lead Time", "Reorder Pt", "Inv. Value", "DSI",
-            "Cov. Ratio", "Demand Intens.", "Category", "Vendor",
+            "Lead Time", "Demand Intens.", "Category", "Vendor",
         ]
 
         fig, axes = plt.subplots(2, 2, figsize=(22, 14), facecolor=CHART_BG_COLOR)
@@ -381,13 +399,15 @@ class MLAnalyzer:
     def plot_regression_analysis(self, df: pd.DataFrame) -> str:
         """Chart 17: LinearRegression, RF Regressor, GB Regressor predicting Inventory_Value."""
         logger.info("chart_17: regression analysis")
-        clean, X, _, y_reg = self._prepare_arrays(df)
+        clean, X, y_reg = self._prepare_regression_arrays(df)
 
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
+        # Split BEFORE scaling to prevent data leakage
         X_train, X_test, y_train, y_test = train_test_split(
-            X_scaled, y_reg, test_size=0.2, random_state=42
+            X, y_reg, test_size=0.2, random_state=42
         )
+        scaler = StandardScaler()
+        X_train = scaler.fit_transform(X_train)
+        X_test = scaler.transform(X_test)
 
         regressors = {
             "Linear Regression": LinearRegression(),

@@ -49,9 +49,25 @@ class ETLPipeline:
     # ------------------------------------------------------------------
     # Extract
     # ------------------------------------------------------------------
+    REQUIRED_COLUMNS = {
+        "Product_ID", "Category", "Unit_Cost_Raw", "Current_Stock_Raw",
+        "Daily_Demand_Est", "Safety_Stock_Target", "Vendor_Name", "Lead_Time_Days",
+    }
+
     def _extract(self, path: str) -> pd.DataFrame:
         logger.info("Step 0: Loading data from %s", path)
-        df = pd.read_csv(path)
+        try:
+            df = pd.read_csv(path)
+        except pd.errors.EmptyDataError:
+            raise ValueError(f"CSV file is empty: {path}")
+        except Exception as e:
+            raise ValueError(f"Failed to read CSV file: {e}")
+        if df.empty:
+            raise ValueError(f"CSV file contains no data rows: {path}")
+        # Schema validation
+        missing = self.REQUIRED_COLUMNS - set(df.columns)
+        if missing:
+            raise ValueError(f"CSV missing required columns: {missing}")
         self.stats["raw_rows"] = len(df)
         self.stats["raw_columns"] = len(df.columns)
         return df

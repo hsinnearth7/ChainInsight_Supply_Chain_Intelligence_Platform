@@ -3,14 +3,38 @@
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    Column, Integer, Float, String, DateTime, Text, JSON,
+    JSON,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
     create_engine,
 )
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
 from app.config import DATABASE_URL
 
 Base = declarative_base()
+
+
+class PipelineRun(Base):
+    """Tracks each pipeline execution."""
+    __tablename__ = "pipeline_runs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    batch_id = Column(String(64), unique=True, nullable=False)
+    status = Column(String(20), default="pending")
+    source_file = Column(String(256))
+    started_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    completed_at = Column(DateTime, nullable=True)
+    etl_stats = Column(JSON, nullable=True)
+    error_message = Column(Text, nullable=True)
+
+    snapshots = relationship("InventorySnapshot", back_populates="pipeline_run", cascade="all, delete-orphan")
+    analysis_results = relationship("AnalysisResult", back_populates="pipeline_run", cascade="all, delete-orphan")
 
 
 class InventorySnapshot(Base):
@@ -18,7 +42,7 @@ class InventorySnapshot(Base):
     __tablename__ = "inventory_snapshots"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    batch_id = Column(String(64), index=True, nullable=False)
+    batch_id = Column(String(64), ForeignKey("pipeline_runs.batch_id"), index=True, nullable=False)
     ingested_at = Column(DateTime, index=True, default=lambda: datetime.now(timezone.utc))
     product_id = Column(String(32), index=True)
     category = Column(String(32))
@@ -32,31 +56,21 @@ class InventorySnapshot(Base):
     stock_status = Column(String(20))
     inventory_value = Column(Float)
 
+    pipeline_run = relationship("PipelineRun", back_populates="snapshots")
+
 
 class AnalysisResult(Base):
     """Stores KPI / chart metadata per pipeline run."""
     __tablename__ = "analysis_results"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    batch_id = Column(String(64), index=True, nullable=False)
-    analysis_type = Column(String(32), nullable=False)  # etl, stats, scm, ml
+    batch_id = Column(String(64), ForeignKey("pipeline_runs.batch_id"), index=True, nullable=False)
+    analysis_type = Column(String(32), nullable=False)
     result_json = Column(JSON)
-    chart_paths = Column(JSON)  # list of chart file paths
+    chart_paths = Column(JSON)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
-
-class PipelineRun(Base):
-    """Tracks each pipeline execution."""
-    __tablename__ = "pipeline_runs"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    batch_id = Column(String(64), unique=True, nullable=False)
-    status = Column(String(20), default="pending")  # pending, running, completed, failed
-    source_file = Column(String(256))
-    started_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    completed_at = Column(DateTime, nullable=True)
-    etl_stats = Column(JSON, nullable=True)
-    error_message = Column(Text, nullable=True)
+    pipeline_run = relationship("PipelineRun", back_populates="analysis_results")
 
 
 # ---- Engine & Session factory ----

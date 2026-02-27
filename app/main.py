@@ -3,17 +3,16 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.config import CHARTS_DIR, RAW_DIR, BASE_DIR
+from app.api.routes import router as api_router
+from app.api.routes import trigger_pipeline_from_path
+from app.config import BASE_DIR, CHARTS_DIR, CORS_ORIGINS, RAW_DIR
 from app.db.models import init_db
-from app.api.routes import router as api_router, trigger_pipeline_from_path
 from app.ws.routes import ws_router
-from app.ws.manager import manager
 
 # Configure logging
 logging.basicConfig(
@@ -76,14 +75,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS (allow React dev server and other frontends)
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["X-API-Key", "Content-Type"],
 )
+
+@app.get("/api/health")
+def health_check():
+    """Health check endpoint (no auth required)."""
+    return {"status": "ok", "name": "ChainInsight Live", "version": "3.0.0"}
 
 # Register WebSocket routes first (before API and static mounts)
 app.include_router(ws_router)

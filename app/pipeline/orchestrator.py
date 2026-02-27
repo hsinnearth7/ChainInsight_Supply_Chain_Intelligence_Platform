@@ -3,22 +3,24 @@
 import logging
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Optional, Callable
+from typing import Callable, Optional
 
 import pandas as pd
 
-from app.config import RAW_DIR, CLEAN_DIR, CHARTS_DIR
+from app.config import CHARTS_DIR, CLEAN_DIR, DEFAULT_RL_EPISODE_LENGTH, DEFAULT_RL_EPISODES, PipelineStatus
+from app.db.models import (
+    AnalysisResult,
+    InventorySnapshot,
+    PipelineRun,
+    SessionLocal,
+    init_db,
+)
 from app.pipeline.etl import ETLPipeline
+from app.pipeline.ml_engine import MLAnalyzer
 from app.pipeline.stats import StatisticalAnalyzer
 from app.pipeline.supply_chain import SupplyChainAnalyzer
-from app.pipeline.ml_engine import MLAnalyzer
-from app.rl.trainer import RLTrainer
 from app.rl.evaluator import RLEvaluator
-from app.db.models import (
-    SessionLocal, init_db,
-    PipelineRun, InventorySnapshot, AnalysisResult,
-)
+from app.rl.trainer import RLTrainer
 
 logger = logging.getLogger(__name__)
 
@@ -52,11 +54,11 @@ class PipelineOrchestrator:
         db = SessionLocal()
         run_record = db.query(PipelineRun).filter(PipelineRun.batch_id == batch_id).first()
         if run_record:
-            run_record.status = "running"
+            run_record.status = PipelineStatus.RUNNING.value
         else:
             run_record = PipelineRun(
                 batch_id=batch_id,
-                status="running",
+                status=PipelineStatus.RUNNING.value,
                 source_file=str(input_path),
             )
             db.add(run_record)
@@ -83,7 +85,10 @@ class PipelineOrchestrator:
             stats_analyzer = StatisticalAnalyzer(output_dir=str(charts_dir))
             stats_results = stats_analyzer.run_all(df_clean)
             all_results["stages"]["stats"] = stats_results
-            self._save_analysis(db, batch_id, "stats", stats_results.get("kpis", {}), stats_results.get("chart_paths", []))
+            self._save_analysis(
+                db, batch_id, "stats",
+                stats_results.get("kpis", {}), stats_results.get("chart_paths", []),
+            )
             self.on_progress("stats", "completed", stats_results)
 
             # Stage 3: Supply Chain Optimization
@@ -91,7 +96,10 @@ class PipelineOrchestrator:
             sc_analyzer = SupplyChainAnalyzer(output_dir=str(charts_dir))
             sc_results = sc_analyzer.run_all(df_clean)
             all_results["stages"]["supply_chain"] = sc_results
-            self._save_analysis(db, batch_id, "supply_chain", sc_results.get("results", {}), sc_results.get("chart_paths", []))
+            self._save_analysis(
+                db, batch_id, "supply_chain",
+                sc_results.get("results", {}), sc_results.get("chart_paths", []),
+            )
             self.on_progress("supply_chain", "completed", sc_results)
 
             # Stage 4: ML Analysis
@@ -106,11 +114,11 @@ class PipelineOrchestrator:
             self.on_progress("rl", "running", {})
             rl_env_kwargs = self._build_rl_env_kwargs(df_clean)
             rl_trainer = RLTrainer(
-                n_episodes=300,
-                episode_length=90,
+                n_episodes=DEFAULT_RL_EPISODES,
+                episode_length=DEFAULT_RL_EPISODE_LENGTH,
                 env_kwargs=rl_env_kwargs,
             )
-            rl_results_raw = rl_trainer.train_all(on_progress=self.on_progress)
+            rl_trainer.train_all(on_progress=self.on_progress)
             comparison_data = rl_trainer.get_comparison_data()
 
             rl_evaluator = RLEvaluator(comparison_data, output_dir=str(charts_dir))
@@ -128,7 +136,7 @@ class PipelineOrchestrator:
             self.on_progress("rl", "completed", rl_kpis)
 
             # Mark pipeline complete
-            run_record.status = "completed"
+            run_record.status = PipelineStatus.COMPLETED.value
             run_record.completed_at = datetime.now(timezone.utc)
             run_record.etl_stats = etl_stats
             db.commit()
@@ -137,7 +145,7 @@ class PipelineOrchestrator:
             logger.info("Pipeline completed — batch_id=%s", batch_id)
 
         except Exception as e:
-            run_record.status = "failed"
+            run_record.status = PipelineStatus.FAILED.value
             run_record.error_message = str(e)
             run_record.completed_at = datetime.now(timezone.utc)
             db.commit()
