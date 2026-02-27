@@ -8,8 +8,9 @@ charts/
 *.env
 .env*
 !.env.example
-frontend/node_modules/
+node_modules/
 frontend/dist/
+.claude/
 .vscode/
 .idea/
 *.egg-info/
@@ -19,3 +20,8 @@ NUL
 venv/
 .venv/
 *.log
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
