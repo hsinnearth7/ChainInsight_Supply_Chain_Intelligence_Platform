@@ -4,7 +4,6 @@ Covers: aggregation, reconciliation, additive consistency.
 """
 
 import numpy as np
-import pandas as pd
 import pytest
 
 from app.forecasting.data_generator import generate_demand_data, build_hierarchy_matrix

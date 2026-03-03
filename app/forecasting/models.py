@@ -149,7 +149,10 @@ class SARIMAXForecaster(ForecastModel):
                 try:
                     with warnings.catch_warnings():
                         warnings.simplefilter("ignore")
-                        model = SARIMAX(y, order=self.order, seasonal_order=self.seasonal_order, enforce_stationarity=False, enforce_invertibility=False)
+                        model = SARIMAX(
+                            y, order=self.order, seasonal_order=self.seasonal_order,
+                            enforce_stationarity=False, enforce_invertibility=False,
+                        )
                         fitted = model.fit(disp=False, maxiter=50)
                         self._models[str(uid)] = fitted
                         self._last_dates[str(uid)] = grp["ds"].iloc[-1]

@@ -28,7 +28,6 @@ import pandas as pd
 import pandera as pa
 
 from app.seed import set_global_seed
-from app.settings import get_data_config
 
 # ---------------------------------------------------------------------------
 # Pandera Schemas (Data Contracts)
@@ -294,7 +293,6 @@ def generate_demand_data(
         lead_time = int(rng.integers(3, 10))
         pending_order_day = -1
 
-        true_demand = demand.copy()
         for t in range(n_dates):
             if t == 0:
                 stock_level[t] = initial_stock

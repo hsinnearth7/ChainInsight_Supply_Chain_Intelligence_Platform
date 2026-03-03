@@ -3,7 +3,6 @@
 Covers: theoretical optimality, policy evaluation, comparison table.
 """
 
-import numpy as np
 import pytest
 
 from app.rl.baselines import (

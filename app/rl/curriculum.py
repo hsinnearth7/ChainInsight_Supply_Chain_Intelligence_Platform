@@ -13,8 +13,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-import numpy as np
-
 from app.logging import get_logger
 from app.rl.multi_product_env import MultiProductInventoryEnv
 from app.settings import get_rl_config

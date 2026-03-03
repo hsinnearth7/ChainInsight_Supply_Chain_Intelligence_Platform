@@ -5,7 +5,6 @@ Covers: spaces, reset, step, stochastic lead time, episode completion.
 
 import numpy as np
 import pytest
-from gymnasium.utils.env_checker import check_env
 
 from app.rl.multi_product_env import MultiProductInventoryEnv
 

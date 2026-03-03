@@ -5,7 +5,6 @@ Verifies invariants that must hold for ALL inputs, not just specific examples.
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from hypothesis import given, settings, assume
 from hypothesis import strategies as st

@@ -27,7 +27,7 @@ def setup_logging(*, json_output: bool = False) -> None:
     structlog.configure(
         processors=[
             *shared_processors,
-            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+            renderer,
         ],
         logger_factory=structlog.stdlib.LoggerFactory(),
         wrapper_class=structlog.stdlib.BoundLogger,

@@ -16,7 +16,6 @@ from app.forecasting.data_generator import (
     build_hierarchy_matrix,
     compute_data_hash,
     generate_demand_data,
-    generate_sku_ids,
     get_data_statistics,
 )
 

@@ -8,12 +8,10 @@ import pandas as pd
 import pytest
 
 from app.forecasting.models import (
-    ForecastModel,
     ForecastModelFactory,
     LightGBMForecaster,
     NaiveMovingAverage,
     RoutingEnsemble,
-    SARIMAXForecaster,
     XGBoostForecaster,
 )
 
