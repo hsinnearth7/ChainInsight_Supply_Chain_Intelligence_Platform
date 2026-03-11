@@ -9,7 +9,7 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=postgresql://chaininsight:changeme@postgres:5432/chaininsight
+      - DATABASE_URL=postgresql://chaininsight:${POSTGRES_PASSWORD:-changeme}@postgres:5432/chaininsight
       - PYTHONHASHSEED=42
       - REDIS_URL=redis://redis:6379/0
     healthcheck:
@@ -41,7 +41,7 @@ services:
     environment:
       POSTGRES_DB: chaininsight
       POSTGRES_USER: chaininsight
-      POSTGRES_PASSWORD: changeme
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

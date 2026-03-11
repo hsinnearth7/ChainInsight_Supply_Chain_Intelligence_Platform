@@ -66,7 +66,7 @@ postgresql:
   auth:
     database: chaininsight
     username: chaininsight
-    password: changeme
+    password: ""  # Set via --set postgresql.auth.password=YOUR_PASSWORD
   persistence:
     size: 2Gi
   resources:
@@ -106,6 +106,7 @@ ingress:
           service: frontend
 
 secrets:
-  apiKey: "change-me-in-production"
-  databaseUrl: "postgresql://chaininsight:changeme@postgres:5432/chaininsight"
-  redisUrl: "redis://redis:6379/0"
+  # Set via --set secrets.apiKey=YOUR_KEY or values override file
+  apiKey: ""
+  databaseUrl: ""
+  redisUrl: ""

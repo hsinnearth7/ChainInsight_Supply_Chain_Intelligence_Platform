@@ -3,14 +3,14 @@ services:
     image: apache/airflow:2.9.0-python3.11
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://chaininsight:changeme@postgres:5432/airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://chaininsight:${POSTGRES_PASSWORD:-changeme}@postgres:5432/airflow
       AIRFLOW__CORE__FERNET_KEY: ""
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       _AIRFLOW_DB_MIGRATE: "true"
       _AIRFLOW_WWW_USER_CREATE: "true"
       _AIRFLOW_WWW_USER_USERNAME: admin
-      _AIRFLOW_WWW_USER_PASSWORD: chaininsight
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_PASSWORD:-changeme}
     volumes:
       - ./dags:/opt/airflow/dags
       - airflow_logs:/opt/airflow/logs
@@ -25,7 +25,7 @@ services:
           --lastname User \
           --role Admin \
           --email admin@chaininsight.dev \
-          --password chaininsight || true
+          --password ${AIRFLOW_PASSWORD:-changeme} || true
     depends_on:
       postgres:
         condition: service_healthy
@@ -36,7 +36,7 @@ services:
       - "8080:8080"
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://chaininsight:changeme@postgres:5432/airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://chaininsight:${POSTGRES_PASSWORD:-changeme}@postgres:5432/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
     volumes:
@@ -59,7 +59,7 @@ services:
     image: apache/airflow:2.9.0-python3.11
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://chaininsight:changeme@postgres:5432/airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://chaininsight:${POSTGRES_PASSWORD:-changeme}@postgres:5432/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     volumes:
       - ./dags:/opt/airflow/dags
@@ -77,7 +77,7 @@ services:
     environment:
       POSTGRES_DB: airflow
       POSTGRES_USER: chaininsight
-      POSTGRES_PASSWORD: changeme
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
     volumes:
       - airflow_pg_data:/var/lib/postgresql/data
     healthcheck:
