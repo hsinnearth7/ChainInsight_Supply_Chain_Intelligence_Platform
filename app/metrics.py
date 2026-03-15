@@ -1,7 +1,7 @@
 """Prometheus metrics instrumentation for ChainInsight.
 
 Provides counters, histograms, and gauges for HTTP requests, forecasting
-accuracy, RL optimization costs, drift detection, and pipeline performance.
+accuracy, capacity planning, S&OP simulation, drift detection, and pipeline performance.
 """
 
 from __future__ import annotations
@@ -58,10 +58,17 @@ if HAS_PROMETHEUS:
         registry=REGISTRY,
     )
 
-    # RL metrics
-    RL_COST_PER_DAY = Gauge(
-        "chaininsight_rl_cost_per_day",
-        "RL optimization cost per day (USD)",
+    # Capacity metrics
+    CAPACITY_UTILIZATION = Gauge(
+        "chaininsight_capacity_utilization",
+        "Average capacity utilization (%)",
+        registry=REGISTRY,
+    )
+
+    # S&OP metrics
+    SOP_FILL_RATE = Gauge(
+        "chaininsight_sop_fill_rate",
+        "S&OP simulation fill rate (%)",
         registry=REGISTRY,
     )
 
@@ -156,16 +163,28 @@ def track_forecast(product_id: str, model: str, mape: float) -> None:
     FORECAST_MAPE.labels(product_id=product_id, model=model).set(mape)
 
 
-def track_rl_cost(cost: float) -> None:
-    """Record RL daily optimization cost.
+def track_capacity_utilization(utilization: float) -> None:
+    """Record average capacity utilization.
 
     Args:
-        cost: Total daily inventory cost in USD.
+        utilization: Capacity utilization percentage.
     """
     if not HAS_PROMETHEUS:
         return
 
-    RL_COST_PER_DAY.set(cost)
+    CAPACITY_UTILIZATION.set(utilization)
+
+
+def track_sop_fill_rate(fill_rate: float) -> None:
+    """Record S&OP simulation fill rate.
+
+    Args:
+        fill_rate: Fill rate percentage.
+    """
+    if not HAS_PROMETHEUS:
+        return
+
+    SOP_FILL_RATE.set(fill_rate)
 
 
 def track_drift(drift_type: str) -> None:
@@ -210,7 +229,7 @@ def track_error(error_type: str) -> None:
     """Increment error counter.
 
     Args:
-        error_type: Category of error ('forecast', 'rl', 'pipeline', 'api').
+        error_type: Category of error ('forecast', 'pipeline', 'api').
     """
     if not HAS_PROMETHEUS:
         return

@@ -28,7 +28,9 @@ const translations = {
   'nav.stats': { en: 'Statistics', zh: '統計分析', ja: '統計分析' },
   'nav.supplyChain': { en: 'Supply Chain', zh: '供應鏈', ja: 'サプライチェーン' },
   'nav.ml': { en: 'ML / AI', zh: '機器學習', ja: '機械学習' },
-  'nav.rl': { en: 'RL Optimization', zh: '強化學習', ja: '強化学習' },
+  'nav.capacity': { en: 'Capacity', zh: '產能規劃', ja: '生産能力' },
+  'nav.sensing': { en: 'Demand Sensing', zh: '需求感知', ja: '需要感知' },
+  'nav.sop': { en: 'S&OP', zh: '銷售營運計畫', ja: 'S&OP' },
   'nav.history': { en: 'History', zh: '歷史記錄', ja: '履歴' },
 
   // ── Dashboard ──
@@ -114,7 +116,9 @@ const translations = {
   'stage.stats': { en: 'Statistical Analysis', zh: '統計分析', ja: '統計分析' },
   'stage.supply_chain': { en: 'Supply Chain', zh: '供應鏈優化', ja: 'サプライチェーン' },
   'stage.ml': { en: 'ML / AI Analysis', zh: '機器學習分析', ja: '機械学習分析' },
-  'stage.rl': { en: 'RL Optimization', zh: '強化學習優化', ja: '強化学習最適化' },
+  'stage.capacity': { en: 'Capacity Planning', zh: '產能規劃', ja: '生産能力計画' },
+  'stage.sensing': { en: 'Demand Sensing', zh: '需求感知', ja: '需要感知' },
+  'stage.sop': { en: 'S&OP Simulation', zh: 'S&OP 模擬', ja: 'S&OP シミュレーション' },
 
   // ── Stats ──
   'stats.title': { en: 'Statistical Analysis', zh: '統計分析', ja: '統計分析' },
@@ -215,30 +219,30 @@ const translations = {
   'ml.metric': { en: 'Metric', zh: '指標', ja: 'メトリクス' },
   'ml.analysisCharts': { en: 'Analysis Charts', zh: '分析圖表', ja: '分析チャート' },
 
-  // ── RL ──
-  'rl.title': { en: 'RL Optimization', zh: '強化學習優化', ja: '強化学習最適化' },
-  'rl.loading': { en: 'Loading RL results...', zh: '載入 RL 結果中...', ja: 'RL結果読込中...' },
-  'rl.noData': { en: 'No data available.', zh: '無可用資料。', ja: 'データがありません。' },
-  'rl.bestAgent': { en: 'Best Agent', zh: '最佳代理', ja: '最良エージェント' },
-  'rl.finalReward': { en: 'Final Reward', zh: '最終獎勵', ja: '最終報酬' },
-  'rl.serviceLevel': { en: 'Service Level', zh: '服務水準', ja: 'サービスレベル' },
-  'rl.agentsTrained': { en: 'Agents Trained', zh: '已訓練代理數', ja: '訓練済エージェント' },
-  'rl.agentComparison': { en: 'Agent Comparison', zh: '代理比較', ja: 'エージェント比較' },
-  'rl.rewardCurves': {
-    en: 'Reward Learning Curves (Interactive)',
-    zh: '獎勵學習曲線（互動）',
-    ja: '報酬学習曲線（インタラクティブ）',
-  },
-  'rl.envSpec': { en: 'Environment Specification', zh: '環境規格', ja: '環境仕様' },
-  'rl.agents': { en: 'Agents', zh: '代理', ja: 'エージェント' },
-  'rl.pipelineCharts': { en: 'Pipeline Charts', zh: '管線圖表', ja: 'パイプラインチャート' },
+  // ── Capacity ──
+  'capacity.title': { en: 'Capacity Planning', zh: '產能規劃', ja: '生産能力計画' },
+  'capacity.loading': { en: 'Loading capacity data...', zh: '載入產能資料中...', ja: '生産能力データ読込中...' },
+  'capacity.noData': { en: 'No data available.', zh: '無可用資料。', ja: 'データがありません。' },
+  'capacity.utilization': { en: 'Utilization', zh: '稼動率', ja: '稼働率' },
+  'capacity.bottlenecks': { en: 'Bottlenecks', zh: '瓶頸', ja: 'ボトルネック' },
+  'capacity.demandVsCapacity': { en: 'Demand vs Capacity', zh: '需求 vs 產能', ja: '需要 vs 生産能力' },
 
-  // ── RL Environment Spec ──
-  'rl.stateSpace': { en: 'State Space', zh: '狀態空間', ja: '状態空間' },
-  'rl.actionSpace': { en: 'Action Space', zh: '動作空間', ja: '行動空間' },
-  'rl.episodes': { en: 'Episodes', zh: '回合數', ja: 'エピソード数' },
-  'rl.stepsPerEpisode': { en: 'Steps/Episode', zh: '每回合步數', ja: 'ステップ/エピソード' },
-  'rl.reward': { en: 'Reward', zh: '獎勵', ja: '報酬' },
+  // ── Sensing ──
+  'sensing.title': { en: 'Demand Sensing', zh: '需求感知', ja: '需要感知' },
+  'sensing.loading': { en: 'Loading sensing data...', zh: '載入感知資料中...', ja: '感知データ読込中...' },
+  'sensing.noData': { en: 'No data available.', zh: '無可用資料。', ja: 'データがありません。' },
+  'sensing.signals': { en: 'Active Signals', zh: '活躍訊號', ja: 'アクティブシグナル' },
+  'sensing.adjustment': { en: 'Forecast Adjustment', zh: '預測調整', ja: '予測調整' },
+  'sensing.spikes': { en: 'Spike Detection', zh: '突增偵測', ja: 'スパイク検出' },
+
+  // ── S&OP ──
+  'sop.title': { en: 'S&OP Simulation', zh: 'S&OP 模擬', ja: 'S&OP シミュレーション' },
+  'sop.loading': { en: 'Loading S&OP data...', zh: '載入 S&OP 資料中...', ja: 'S&OPデータ読込中...' },
+  'sop.noData': { en: 'No data available.', zh: '無可用資料。', ja: 'データがありません。' },
+  'sop.fillRate': { en: 'Fill Rate', zh: '滿足率', ja: '充足率' },
+  'sop.scenarios': { en: 'Scenarios', zh: '情境', ja: 'シナリオ' },
+  'sop.demandSupplyBalance': { en: 'Demand-Supply Balance', zh: '供需平衡', ja: '需給バランス' },
+  'sop.comparison': { en: 'Scenario Comparison', zh: '情境比較', ja: 'シナリオ比較' },
 
   // ── History ──
   'history.title': { en: 'Pipeline History', zh: '管線歷史', ja: 'パイプライン履歴' },

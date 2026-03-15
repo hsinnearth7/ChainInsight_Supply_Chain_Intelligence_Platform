@@ -8,7 +8,7 @@ export interface StageStatus {
   progress_pct: number;
 }
 
-const STAGES = ['etl', 'stats', 'supply_chain', 'ml', 'rl'];
+const STAGES = ['etl', 'stats', 'supply_chain', 'ml', 'capacity', 'sensing', 'sop'];
 
 const initialStages: StageStatus[] = STAGES.map((s) => ({
   stage: s,
@@ -41,7 +41,7 @@ export function usePipelineProgress(batchId: string | null) {
     );
 
     // Check if all done
-    if (stage === 'rl' && status === 'completed') {
+    if (stage === 'sop' && status === 'completed') {
       setPipelineStatus('completed');
       setOverallPct(100);
     } else if (status === 'running' && pipelineStatus !== 'running') {

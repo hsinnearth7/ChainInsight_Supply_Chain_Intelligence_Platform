@@ -7,7 +7,9 @@ labels:
 include:
   - "*.py"
   - "../app/forecasting/*.py"
-  - "../app/rl/*.py"
+  - "../app/capacity/*.py"
+  - "../app/sensing/*.py"
+  - "../app/sop/*.py"
   - "../configs/*.yaml"
 
 python:
@@ -19,8 +21,6 @@ python:
     - lightgbm>=4.0.0
     - xgboost>=2.0.0
     - statsforecast>=1.7.0
-    - torch>=2.2.0
-    - stable-baselines3>=2.3.0
     - evidently>=0.4.0
     - pyyaml>=6.0
     - scipy>=1.12.0

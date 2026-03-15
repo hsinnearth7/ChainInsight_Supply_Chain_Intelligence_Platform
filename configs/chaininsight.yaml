@@ -1,4 +1,4 @@
-# ChainInsight Configuration — Supply Chain Forecasting + RL Replenishment
+# ChainInsight Configuration — Supply Chain Forecasting + Capacity Planning + S&OP
 # All hard-coded values extracted here for reproducibility and easy tuning.
 
 data:
@@ -37,6 +37,26 @@ model:
   routing:
     cold_start_threshold_days: 60
     intermittency_threshold: 0.5
+  prophet:
+    yearly_seasonality: true
+    weekly_seasonality: true
+    changepoint_prior_scale: 0.05
+  lstm:
+    hidden_size: 32
+    num_layers: 1
+    lookback: 30
+    epochs: 50
+    learning_rate: 0.001
+  nbeats:
+    input_size: 30
+    horizon: 14
+    max_steps: 100
+    n_harmonics: 3
+    poly_degree: 2
+  tft:
+    input_size: 30
+    horizon: 14
+    max_steps: 100
 
 evaluation:
   cv_windows: 12
@@ -46,29 +66,31 @@ evaluation:
   significance_alpha: 0.05
   conformal_target_coverage: 0.90
 
-rl:
-  episodes: 300
-  episode_length: 90
-  curriculum:
-    - { n_products: 1, stochastic_lead_time: false, timesteps: 20000 }
-    - { n_products: 3, stochastic_lead_time: false, timesteps: 30000 }
-    - { n_products: 5, stochastic_lead_time: true,  timesteps: 50000 }
-  ppo:
-    learning_rate: 0.0003
-    n_steps: 2048
-    batch_size: 64
-    n_epochs: 10
-    gamma: 0.99
-    gae_lambda: 0.95
-    clip_range: 0.2
-    ent_coef: 0.01
-    vf_coef: 0.5
-  sac:
-    learning_rate: 0.0003
-    buffer_size: 100000
-    batch_size: 256
-    tau: 0.005
-    gamma: 0.99
+capacity:
+  production_lines: 3
+  shift_hours: 8
+  max_overtime_hours: 4
+  changeover_cost_per_hour: 150
+  utilization_target: 0.85
+  planning_horizon_days: 90
+
+sensing:
+  signal_sources: ["pos", "social", "weather"]
+  pos_weight: 0.6
+  social_weight: 0.25
+  weather_weight: 0.15
+  decay_half_life_days: 7
+  spike_threshold_sigma: 2.5
+  sensing_horizon_days: 14
+
+sop:
+  default_scenarios: ["baseline", "optimistic", "conservative"]
+  planning_horizon_days: 90
+  time_bucket: "weekly"
+  target_fill_rate: 0.95
+  target_inventory_turns: 12
+  stockout_penalty: 50.0
+  holding_cost_rate: 0.25
 
 supply_chain:
   ordering_cost: 50       # $/order

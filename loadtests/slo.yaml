@@ -66,15 +66,15 @@ slos:
       degradation_trigger: 3  # Alert after 3 consecutive breaches
       auto_retrain: true
 
-  # --- RL Optimization ---
-  - name: rl-cost-efficiency
-    description: "RL optimization achieves at least 10% cost reduction vs baseline"
-    target: 90.0
+  # --- S&OP Planning ---
+  - name: sop-fill-rate
+    description: "S&OP simulation fill rate above 95%"
+    target: 95.0
     window: 7d
     indicator:
       type: quality
-      metric: "chaininsight_rl_cost_per_day"
-      baseline_comparison: true
+      metric: "chaininsight_sop_fill_rate"
+      threshold: 0.95
 
   # --- Pipeline Reliability ---
   - name: pipeline-success-rate

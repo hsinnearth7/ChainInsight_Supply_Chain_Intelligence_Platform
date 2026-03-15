@@ -6,7 +6,9 @@ import UploadPage from './pages/UploadPage';
 import StatsPage from './pages/StatsPage';
 import SupplyChainPage from './pages/SupplyChainPage';
 import MLPage from './pages/MLPage';
-import RLPage from './pages/RLPage';
+import CapacityPage from './pages/CapacityPage';
+import SensingPage from './pages/SensingPage';
+import SOPPage from './pages/SOPPage';
 import HistoryPage from './pages/HistoryPage';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useAppStore } from './stores/appStore';
@@ -47,7 +49,9 @@ export default function App() {
           <Route path="stats" element={<StatsPage />} />
           <Route path="supply-chain" element={<SupplyChainPage />} />
           <Route path="ml" element={<MLPage />} />
-          <Route path="rl" element={<RLPage />} />
+          <Route path="capacity" element={<CapacityPage />} />
+          <Route path="sensing" element={<SensingPage />} />
+          <Route path="sop" element={<SOPPage />} />
           <Route path="history" element={<HistoryPage />} />
         </Route>
       </Routes>

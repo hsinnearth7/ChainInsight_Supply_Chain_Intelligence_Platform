@@ -1,19 +1,19 @@
 <div align="center">
 
-# ChainInsight — Hierarchical Demand Forecasting + RL Inventory Optimization
+# ChainInsight — Demand Planning Engine
 
-**Nixtla-format time series forecasting with rigorous statistical evaluation, hierarchical reconciliation, and curriculum-learning RL for a 200-SKU retail supply chain**
+**Nixtla-format time series forecasting with rigorous statistical evaluation, hierarchical reconciliation, capacity planning, demand sensing, and S&OP simulation for a 200-SKU retail supply chain**
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen.svg)](.github/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Tests: 163](https://img.shields.io/badge/tests-163-blue.svg)](tests/)
+[![Tests: 155+](https://img.shields.io/badge/tests-155+-blue.svg)](tests/)
 [![Coverage: 85%+](https://img.shields.io/badge/coverage-85%25+-yellow.svg)](tests/)
 [![Docker](https://img.shields.io/badge/docker-compose-2496ED.svg)](docker-compose.yml)
 
 </div>
 
-> ChainInsight is an end-to-end supply chain analytics platform that generates M5-style synthetic demand data for 200 SKUs across 3 warehouses, fits 6 forecasting models (including Chronos-2 zero-shot foundation model), reconciles predictions via 4-layer hierarchical forecasting (MinTrace), and optimizes inventory replenishment with curriculum-learning RL (PPO+SAC). The routing ensemble achieves **MAPE 10.3%** [9.8, 10.8] 95% CI — a statistically significant improvement over all individual models (Wilcoxon p<0.001, Cohen's d=3.0). A Feature Store pattern ensures training-serving consistency (AP > CP), while Evidently monitors 3 types of drift with auto-retrain triggers.
+> ChainInsight is an end-to-end demand planning engine that generates M5-style synthetic demand data for 200 SKUs across 3 warehouses, fits 6 forecasting models (including Chronos-2 zero-shot foundation model), reconciles predictions via 4-layer hierarchical forecasting (MinTrace), analyzes production capacity and bottlenecks, adjusts near-term forecasts via demand sensing, and simulates S&OP scenarios to balance demand, capacity, and supply. The routing ensemble achieves **MAPE 10.3%** [9.8, 10.8] 95% CI — a statistically significant improvement over all individual models (Wilcoxon p<0.001, Cohen's d=3.0). A Feature Store pattern ensures training-serving consistency (AP > CP), while Evidently monitors 3 types of drift with auto-retrain triggers.
 
 ---
 
@@ -27,17 +27,17 @@
            ┌──────────────────────────────────┼──────────────────────────────────┐
            ▼                                  ▼                                  ▼
    ┌───────────────┐              ┌───────────────────┐              ┌───────────────┐
-   │  Data Layer   │              │ Forecasting Layer  │              │   RL Layer    │
+   │  Data Layer   │              │ Forecasting Layer  │              │ Planning Layer│
    │               │              │                    │              │               │
-   │ Nixtla Format │──────────────▶ 6 Models + Routing │              │ PPO + SAC     │
-   │ (Y, S, X_f,   │   Feature    │ Ensemble           │              │ Curriculum    │
-   │  X_p)         │    Store     │                    │              │ (1→3→5 SKU)   │
-   │               │  (offline/   │ Hierarchical       │              │               │
-   │ Pandera       │   online)    │ Reconciliation     │              │ Stockpyl      │
-   │ Contracts     │              │ (MinTrace)         │              │ Baseline      │
-   │               │              │                    │              │               │
-   │ 4-Layer       │              │ Walk-Forward CV    │              │ Multi-Product │
-   │ Hierarchy     │              │ (12-fold)          │              │ Gymnasium Env │
+   │ Nixtla Format │──────────────▶ 6 Models + Routing │              │ Capacity      │
+   │ (Y, S, X_f,   │   Feature    │ Ensemble           │──────────────▶ Planning      │
+   │  X_p)         │    Store     │                    │              │               │
+   │               │  (offline/   │ Hierarchical       │              │ Demand        │
+   │ Pandera       │   online)    │ Reconciliation     │              │ Sensing       │
+   │ Contracts     │              │ (MinTrace)         │              │               │
+   │               │              │                    │              │ S&OP          │
+   │ 4-Layer       │              │ Walk-Forward CV    │              │ Simulator     │
+   │ Hierarchy     │              │ (12-fold)          │              │               │
    │ (224 nodes)   │              │                    │              │               │
    └───────────────┘              └───────────────────┘              └───────────────┘
            │                                  │                                  │
@@ -78,19 +78,6 @@
 | **Routing Ensemble** | **10.3%** | **[9.8, 10.8]** | **−12.0%** | <0.001*** | 3.0 (L) | **Overall best** |
 
 > **Evaluation Protocol:** 12-fold walk-forward CV (monthly retrain, 14-day horizon). Statistical test: Wilcoxon signed-rank vs Naive baseline, α=0.05. Effect size: Cohen's d — S(<0.5), M(0.5–0.8), L(>0.8). Conformal intervals: 90% target coverage, 91.2% actual. Significance: \*p<0.05, \*\*p<0.01, \*\*\*p<0.001.
-
-### RL Inventory Optimization
-
-| Algorithm | Avg Cost/Day | Service Level | Training Time |
-|-----------|-------------|---------------|---------------|
-| (s,S) policy | $1,200 | 91% | N/A |
-| EOQ | $1,150 | 89% | N/A |
-| Newsvendor (theory) | $1,000 | 95% | N/A (theoretical) |
-| PPO | $1,050 | 95% | 2 hours |
-| SAC | $1,080 | 94% | 3 hours |
-| **PPO + curriculum** | **$1,020** | **95%** | 4 hours |
-
-> PPO+curriculum reaches Newsvendor theoretical optimum +2%; (s,S) is +20% above theoretical.
 
 ### Ablation Study — Feature Group Contribution
 
@@ -192,19 +179,17 @@ This routing reduces ensemble MAPE from 12.1% → **10.3%** by leveraging each m
 - **Conformal prediction:** Calibrated 90% intervals with finite-sample correction
 - **Ablation study:** Systematic feature group removal quantifies each group's contribution
 
-### RL — Curriculum Learning + Stockpyl Theoretical Baseline
+### Capacity Planning + Demand Sensing + S&OP
 
-3-phase curriculum progressively increases complexity:
+Forecasts feed into three planning modules:
 
-| Phase | Products | Lead Time | Timesteps |
-|-------|----------|-----------|-----------|
-| 1 | 1 | Deterministic | 20K |
-| 2 | 3 | Deterministic | 30K |
-| 3 | 5 | **Stochastic** | 50K |
+| Module | Purpose | Key Output |
+|--------|---------|-----------|
+| **Capacity Planning** | Compare demand vs production capacity | Bottleneck detection, utilization timeline |
+| **Demand Sensing** | Adjust near-term forecasts with POS/social signals | Signal-adjusted forecasts, spike detection |
+| **S&OP Simulator** | Scenario-based demand-supply balancing | Fill rate, inventory cost, scenario comparison |
 
-Result: 40% faster convergence; final cost 3% lower than training on full environment directly.
-
-**Stockpyl Newsvendor** provides the theoretical optimum as an upper bound. PPO+curriculum reaches within +2% of theory, validating RL's real-world applicability.
+The S&OP simulator runs baseline/optimistic/conservative scenarios and compares KPIs (fill rate, utilization, inventory cost) to support data-driven planning decisions.
 
 ---
 
@@ -221,14 +206,15 @@ ChainInsight/
 │   │   ├── hierarchy.py                # 4-layer MinTrace reconciliation
 │   │   ├── feature_store.py            # Offline/online feature store (AP > CP)
 │   │   └── drift_monitor.py            # Evidently: KS + PSI + MAPE drift
-│   ├── rl/
-│   │   ├── environment.py              # Gymnasium InventoryEnv (single-product)
-│   │   ├── multi_product_env.py        # Multi-product env (SAC-compatible)
-│   │   ├── curriculum.py               # 3-phase curriculum learning
-│   │   ├── baselines.py                # Newsvendor + (s,S) + EOQ baselines
-│   │   ├── trainer.py                  # Trains Q-Learning/SARSA/DQN/PPO/A2C/GA-RL
-│   │   ├── evaluator.py               # Charts 23-28, agent comparison
-│   │   └── agents/                     # 6 RL agents
+│   ├── capacity/
+│   │   ├── models.py                   # CapacityPlanner, bottleneck detection
+│   │   └── visualization.py            # Utilization timeline, bottleneck charts
+│   ├── sensing/
+│   │   ├── signals.py                  # SignalProcessor, demand spike detection
+│   │   └── visualization.py            # Signal timeline, forecast adjustment charts
+│   ├── sop/
+│   │   ├── simulator.py                # SOPSimulator, scenario comparison
+│   │   └── visualization.py            # Demand-supply balance, scenario charts
 │   ├── pipeline/                       # ETL + Stats + Supply Chain + ML Engine
 │   ├── api/routes.py                   # FastAPI REST endpoints
 │   ├── ws/                             # WebSocket real-time
@@ -238,7 +224,7 @@ ChainInsight/
 │   └── seed.py                         # Global seed management
 ├── configs/
 │   └── chaininsight.yaml               # All hyperparameters (no hard-coded values)
-├── tests/                              # 163 tests (14 files)
+├── tests/                              # 155+ tests (14 files)
 │   ├── test_data_generator.py          # Schema, M5 properties, hierarchy (27)
 │   ├── test_forecasting_models.py      # Unified interface, factory, routing (14)
 │   ├── test_evaluation.py              # Metrics, Wilcoxon, Cohen's d, conformal (21)
@@ -246,13 +232,13 @@ ChainInsight/
 │   ├── test_feature_store.py           # Offline/online stores (11)
 │   ├── test_drift_monitor.py           # KS, PSI, concept drift (8)
 │   ├── test_property_based.py          # Hypothesis invariant tests (7)
-│   ├── test_multi_product_env.py       # Multi-product env (14)
-│   ├── test_rl_baselines.py            # Newsvendor, (s,S), EOQ (12)
+│   ├── test_capacity.py                # Capacity planning, bottleneck detection (8)
+│   ├── test_sensing.py                 # Demand sensing, spike detection (8)
+│   ├── test_sop.py                     # S&OP simulation, scenario comparison (9)
 │   ├── test_config.py                  # YAML loading (16)
 │   ├── test_etl.py                     # ETL pipeline (6)
 │   ├── test_ml_leakage.py              # Anti-leakage guards (4)
-│   ├── test_api_security.py            # Auth, path traversal, rate limit (11)
-│   └── test_rl_environment.py          # Gymnasium compliance (7)
+│   └── test_api_security.py            # Auth, path traversal, rate limit (11)
 ├── docs/
 │   ├── model_card.md                   # Mitchell et al., FAT* 2019
 │   ├── reproducibility.md              # NeurIPS 2019 Reproducibility Checklist
@@ -373,14 +359,14 @@ python -m app.forecasting.data_generator --validate-only
 
 ## Testing
 
-**163 tests** across 14 test files, covering Google ML Test Score 4 categories:
+**155+ tests** across 14 test files, covering Google ML Test Score 4 categories:
 
 | Category | Tests | Examples |
 |----------|-------|---------|
 | Data tests | 38 | Schema validation, M5 properties, hierarchy, reproducibility |
 | Model tests | 35 | Unified interface, routing logic, feature importance |
 | Infrastructure tests | 53 | API security, config loading, Feature Store, drift monitor |
-| Monitoring tests | 37 | Drift detection, RL baselines, property-based invariants |
+| Planning tests | 25 | Capacity planning, demand sensing, S&OP simulation |
 
 **Property-based testing** (Hypothesis): metric invariants, forecast non-negativity, conformal interval containment.
 
@@ -410,7 +396,7 @@ See full analysis: [`docs/failure_modes.md`](docs/failure_modes.md)
 |-------|-------------|
 | **Language** | Python 3.10+, TypeScript |
 | **Forecasting** | statsforecast, hierarchicalforecast, LightGBM, XGBoost, Chronos-2 |
-| **RL** | Gymnasium, PyTorch, stable-baselines3, Stockpyl |
+| **Planning** | Capacity Planning, Demand Sensing, S&OP Simulation |
 | **MLOps** | Evidently (drift), Pandera (contracts), structlog, YAML configs |
 | **Backend** | FastAPI, uvicorn, SQLAlchemy, SQLite |
 | **Frontend** | React 18, Vite, Tailwind CSS, Recharts, Zustand |
@@ -425,11 +411,10 @@ See full analysis: [`docs/failure_modes.md`](docs/failure_modes.md)
 2. Ke, G., Meng, Q., Finley, T., et al. (2017). "LightGBM: A Highly Efficient Gradient Boosting Decision Tree." *NeurIPS 2017*.
 3. Ansari, A. F., Stella, L., Turkmen, C., et al. (2024). "Chronos: Learning the Language of Time Series." *arXiv:2403.07815*.
 4. Wickramasuriya, S. L., Athanasopoulos, G., & Hyndman, R. J. (2019). "Optimal Forecast Reconciliation for Hierarchical and Grouped Time Series Through Trace Minimization." *JASA*, 114(526), 804–819.
-5. Snyder, L. V. & Shen, Z.-J. M. (2019). *Fundamentals of Inventory Management and Control*. Stockpyl documentation.
-6. Sutton, R. S. & Barto, A. G. (2018). *Reinforcement Learning: An Introduction* (2nd ed.). MIT Press.
-7. Mitchell, M., Wu, S., Zaldivar, A., et al. (2019). "Model Cards for Model Reporting." *FAT\* 2019*.
-8. Pineau, J. et al. (2019). "The Machine Learning Reproducibility Checklist." *NeurIPS 2019*.
-9. Zügner, D. et al. (2021). "Google ML Test Score: A Rubric for ML Production Readiness." *Google Research*.
+5. Thomé, A. M. T., et al. (2012). "Sales and Operations Planning: A Research Synthesis." *International Journal of Production Economics*, 138(1), 1–13.
+6. Mitchell, M., Wu, S., Zaldivar, A., et al. (2019). "Model Cards for Model Reporting." *FAT\* 2019*.
+7. Pineau, J. et al. (2019). "The Machine Learning Reproducibility Checklist." *NeurIPS 2019*.
+8. Zügner, D. et al. (2021). "Google ML Test Score: A Rubric for ML Production Readiness." *Google Research*.
 
 ---
 
@@ -441,7 +426,7 @@ MIT License — see [LICENSE](LICENSE).
 
 <div align="center">
 
-**MAPE 10.3% · AP > CP · Graceful Degradation**
+**MAPE 10.3% · S&OP Simulation · AP > CP · Graceful Degradation**
 
 *Built with statistical rigor. Designed for production reliability.*
 
@@ -475,7 +460,7 @@ ChainInsight includes production-grade deployment infrastructure spanning three 
 │   └── templates/               # 9 templated manifests
 ├── serving/                     # BentoML model serving
 │   ├── bentofile.yaml
-│   └── service.py               # forecast / rl_optimize / detect_drift
+│   └── service.py               # forecast / detect_drift
 ├── monitoring/                  # Observability stack
 │   ├── prometheus.yml
 │   ├── docker-compose.monitoring.yaml
@@ -509,7 +494,7 @@ ChainInsight includes production-grade deployment infrastructure spanning three 
 |-----------|-----------|---------|
 | **Container Orchestration** | Kubernetes | Backend (2 replicas) + Frontend (2 replicas), liveness/readiness probes, HPA |
 | **Helm Chart** | Helm v3 | Parameterized: backend, frontend, postgresql, redis, ingress |
-| **Model Serving** | BentoML | 3 endpoints: `forecast` (6-model routing), `rl_optimize` (PPO), `detect_drift` |
+| **Model Serving** | BentoML | 2 endpoints: `forecast` (6-model routing), `detect_drift` |
 | **Database** | PostgreSQL 16 | StatefulSet with 2Gi persistent volume |
 | **Cache** | Redis 7 | Feature store online serving + session cache |
 | **Secrets** | K8s Secrets | API keys, database URLs, Redis URLs |
@@ -520,7 +505,7 @@ ChainInsight includes production-grade deployment infrastructure spanning three 
 |-----------|-----------|---------|
 | **Model Registry** | MLflow | log_model_run, register_model, transition_stage, get_production_model |
 | **Metrics** | Prometheus | 8 custom metrics (`chaininsight_*`) + MetricsTimer context manager |
-| **Dashboards** | Grafana | 7 panels: request rate, latency, forecast MAPE, RL cost, drift alerts, pipeline, errors |
+| **Dashboards** | Grafana | 7 panels: request rate, latency, forecast MAPE, capacity utilization, drift alerts, pipeline, errors |
 | **Canary Deployment** | Istio + Flagger | 10% step, 50% max weight, success rate + latency thresholds |
 | **Pipeline Orchestration** | Apache Airflow | Training DAG (daily, 7 tasks) + Monitoring DAG (6-hourly, auto-retrain branching) |
 

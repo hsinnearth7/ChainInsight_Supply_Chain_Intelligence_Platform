@@ -77,4 +77,4 @@ python -m app.reproduce --seed 42
 Results are considered reproducible if:
 - MAPE difference < 0.1% absolute
 - Statistical test p-values agree on significance at α=0.05
-- RL cumulative reward within 2% of reference
+- S&OP scenario KPIs within 0.5% of reference run

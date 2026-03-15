@@ -7,7 +7,9 @@ const STAGE_LABEL_KEYS: Record<string, TranslationKey> = {
   stats: 'stage.stats',
   supply_chain: 'stage.supply_chain',
   ml: 'stage.ml',
-  rl: 'stage.rl',
+  capacity: 'stage.capacity',
+  sensing: 'stage.sensing',
+  sop: 'stage.sop',
 };
 
 interface PipelineProgressProps {

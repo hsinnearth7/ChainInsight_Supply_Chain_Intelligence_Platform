@@ -1,7 +1,7 @@
 [project]
 name = "chaininsight"
 version = "2.0.0"
-description = "End-to-end supply chain inventory analytics: hierarchical forecasting + RL replenishment + MLOps"
+description = "End-to-end supply chain demand planning: hierarchical forecasting + capacity planning + S&OP"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 dependencies = [
@@ -30,11 +30,6 @@ dependencies = [
     "websockets>=12.0,<14.0",
     # Database
     "sqlalchemy>=2.0.27,<3.0",
-    # RL
-    "gymnasium>=0.29.1,<1.0",
-    "torch>=2.2.0,<3.0",
-    "stable-baselines3>=2.3.0",
-    "stockpyl>=1.0.0",
     # Config & logging
     "structlog>=23.0.0",
     "pyyaml>=6.0",

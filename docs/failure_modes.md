@@ -21,13 +21,13 @@
 | Routing Ensemble | All sub-models fail | Empty prediction check | No ensemble output | Serve Naive baseline + alert |
 | Hierarchical reconciliation | Singular S matrix | LinAlgError catch | Inconsistent hierarchy | Fallback to BottomUp |
 
-### 3. RL Training
+### 3. Capacity Planning & S&OP
 
 | Component | Failure Mode | Detection | Impact | Mitigation |
 |-----------|-------------|-----------|--------|------------|
-| PPO training | Divergence | Reward trend monitoring | Useless policy | Early stopping + checkpoint |
-| Curriculum transfer | Env mismatch | Action space validation | Transfer fails | Reinitialize from scratch |
-| Stockpyl import | Package not installed | ImportError | No theoretical baseline | Manual newsvendor calculation |
+| Capacity planner | No capacity profiles | Config validation | No feasibility check | Default profiles from YAML |
+| S&OP simulator | Scenario divergence | KPI bounds check | Unrealistic plan | Constrain to historical ranges |
+| Demand sensing | Stale signals | Signal age check | Outdated adjustments | Fallback to base forecast |
 
 ### 4. MLOps / Monitoring
 

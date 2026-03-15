@@ -264,7 +264,7 @@ def get_run_status(batch_id: str, db: Session = Depends(get_db)):
 @router.get("/runs/{batch_id}/analysis/{analysis_type}")
 def get_analysis(batch_id: str, analysis_type: str, db: Session = Depends(get_db)):
     """Get KPIs + chart_paths for a specific analysis stage."""
-    valid_types = ["etl", "stats", "supply_chain", "ml", "rl"]
+    valid_types = ["etl", "stats", "supply_chain", "ml", "capacity", "sensing", "sop"]
     if analysis_type not in valid_types:
         raise HTTPException(400, f"Invalid analysis_type. Must be one of: {valid_types}")
 

@@ -99,19 +99,19 @@
       ]
     },
     {
-      "title": "RL Optimization Cost per Day",
+      "title": "Capacity Utilization",
       "type": "stat",
       "gridPos": { "h": 8, "w": 6, "x": 12, "y": 8 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
-          "unit": "currencyUSD",
+          "unit": "percent",
           "thresholds": {
             "mode": "absolute",
             "steps": [
               { "color": "green", "value": null },
-              { "color": "yellow", "value": 5000 },
-              { "color": "red", "value": 10000 }
+              { "color": "yellow", "value": 80 },
+              { "color": "red", "value": 95 }
             ]
           }
         },
@@ -119,8 +119,8 @@
       },
       "targets": [
         {
-          "expr": "chaininsight_rl_cost_per_day",
-          "legendFormat": "Daily Cost",
+          "expr": "chaininsight_capacity_utilization",
+          "legendFormat": "Utilization",
           "refId": "A"
         }
       ],

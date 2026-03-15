@@ -10,8 +10,12 @@ import pytest
 from app.forecasting.models import (
     ForecastModelFactory,
     LightGBMForecaster,
+    LSTMForecaster,
+    NBEATSForecaster,
     NaiveMovingAverage,
+    ProphetForecaster,
     RoutingEnsemble,
+    TFTForecaster,
     XGBoostForecaster,
 )
 
@@ -63,7 +67,10 @@ def cold_start_y_df():
 class TestUnifiedInterface:
     """All models implement the ForecastModel protocol."""
 
-    @pytest.mark.parametrize("model_name", ["naive_ma30", "sarimax", "xgboost", "lightgbm"])
+    @pytest.mark.parametrize("model_name", [
+        "naive_ma30", "sarimax", "xgboost", "lightgbm",
+        "prophet", "lstm", "nbeats", "tft",
+    ])
     def test_model_has_fit_predict(self, model_name):
         """All models have fit() and predict() methods."""
         model = ForecastModelFactory.create(model_name)
@@ -71,14 +78,20 @@ class TestUnifiedInterface:
         assert hasattr(model, "predict")
         assert hasattr(model, "name")
 
-    @pytest.mark.parametrize("model_name", ["naive_ma30", "xgboost", "lightgbm"])
+    @pytest.mark.parametrize("model_name", [
+        "naive_ma30", "xgboost", "lightgbm",
+        "prophet", "lstm", "nbeats", "tft",
+    ])
     def test_model_fit_returns_self(self, model_name, sample_y_df):
         """fit() returns self for method chaining."""
         model = ForecastModelFactory.create(model_name)
         result = model.fit(sample_y_df)
         assert result is model
 
-    @pytest.mark.parametrize("model_name", ["naive_ma30", "xgboost", "lightgbm"])
+    @pytest.mark.parametrize("model_name", [
+        "naive_ma30", "xgboost", "lightgbm",
+        "prophet", "lstm", "nbeats", "tft",
+    ])
     def test_model_predict_returns_dataframe(self, model_name, sample_y_df):
         """predict() returns DataFrame with required columns."""
         model = ForecastModelFactory.create(model_name)
@@ -89,7 +102,10 @@ class TestUnifiedInterface:
         assert "ds" in forecasts.columns
         assert "y_hat" in forecasts.columns
 
-    @pytest.mark.parametrize("model_name", ["naive_ma30", "xgboost", "lightgbm"])
+    @pytest.mark.parametrize("model_name", [
+        "naive_ma30", "xgboost", "lightgbm",
+        "prophet", "lstm", "nbeats", "tft",
+    ])
     def test_forecasts_non_negative(self, model_name, sample_y_df):
         """All forecasts are non-negative."""
         model = ForecastModelFactory.create(model_name)
@@ -130,6 +146,90 @@ class TestLightGBMForecaster:
         importance = model.feature_importance
         assert importance is not None
         assert len(importance) > 0
+
+
+class TestProphetForecaster:
+    def test_name(self):
+        model = ProphetForecaster()
+        assert model.name == "prophet"
+
+    def test_fit_predict_fallback(self, sample_y_df):
+        model = ProphetForecaster()
+        model.fit(sample_y_df)
+        forecasts = model.predict(h=7)
+        assert len(forecasts) > 0
+        assert (forecasts["y_hat"] >= 0).all()
+
+    def test_correct_forecast_length(self, sample_y_df):
+        model = ProphetForecaster()
+        model.fit(sample_y_df)
+        h = 7
+        forecasts = model.predict(h=h)
+        n_series = sample_y_df["unique_id"].nunique()
+        assert len(forecasts) == n_series * h
+
+
+class TestLSTMForecaster:
+    def test_name(self):
+        model = LSTMForecaster()
+        assert model.name == "lstm"
+
+    def test_fit_predict_fallback(self, sample_y_df):
+        model = LSTMForecaster(lookback=14)
+        model.fit(sample_y_df)
+        forecasts = model.predict(h=7)
+        assert len(forecasts) > 0
+        assert (forecasts["y_hat"] >= 0).all()
+
+    def test_correct_forecast_length(self, sample_y_df):
+        model = LSTMForecaster(lookback=14)
+        model.fit(sample_y_df)
+        h = 7
+        forecasts = model.predict(h=h)
+        n_series = sample_y_df["unique_id"].nunique()
+        assert len(forecasts) == n_series * h
+
+
+class TestNBEATSForecaster:
+    def test_name(self):
+        model = NBEATSForecaster()
+        assert model.name == "nbeats"
+
+    def test_fit_predict_fallback(self, sample_y_df):
+        model = NBEATSForecaster()
+        model.fit(sample_y_df)
+        forecasts = model.predict(h=7)
+        assert len(forecasts) > 0
+        assert (forecasts["y_hat"] >= 0).all()
+
+    def test_correct_forecast_length(self, sample_y_df):
+        model = NBEATSForecaster()
+        model.fit(sample_y_df)
+        h = 7
+        forecasts = model.predict(h=h)
+        n_series = sample_y_df["unique_id"].nunique()
+        assert len(forecasts) == n_series * h
+
+
+class TestTFTForecaster:
+    def test_name(self):
+        model = TFTForecaster()
+        assert model.name == "tft"
+
+    def test_fit_predict_fallback(self, sample_y_df):
+        model = TFTForecaster()
+        model.fit(sample_y_df)
+        forecasts = model.predict(h=7)
+        assert len(forecasts) > 0
+        assert (forecasts["y_hat"] >= 0).all()
+
+    def test_correct_forecast_length(self, sample_y_df):
+        model = TFTForecaster()
+        model.fit(sample_y_df)
+        h = 7
+        forecasts = model.predict(h=h)
+        n_series = sample_y_df["unique_id"].nunique()
+        assert len(forecasts) == n_series * h
 
 
 # ---------------------------------------------------------------------------
@@ -175,6 +275,15 @@ class TestForecastModelFactory:
         assert "lightgbm" in models
         assert "routing_ensemble" in models
 
+    def test_available_models_count(self):
+        models = ForecastModelFactory.available_models()
+        assert len(models) == 10
+
+    def test_new_models_in_registry(self):
+        models = ForecastModelFactory.available_models()
+        for name in ["prophet", "lstm", "nbeats", "tft"]:
+            assert name in models
+
     def test_create_all(self):
         models = ForecastModelFactory.create_all()
-        assert len(models) == 6
+        assert len(models) == 10

@@ -6,12 +6,16 @@ All models implement the ForecastModel protocol:
     - name → str
 
 Models:
-    1. NaiveMovingAverage  — rolling mean baseline
-    2. SARIMAXForecaster   — seasonal ARIMA with exogenous
-    3. XGBoostForecaster   — gradient boosting with lag features
-    4. LightGBMForecaster  — LightGBM with lag features
-    5. ChronosForecaster   — Amazon Chronos-2 zero-shot (foundation model)
-    6. RoutingEnsemble     — cold-start routing logic
+    1. NaiveMovingAverage   — rolling mean baseline
+    2. SARIMAXForecaster    — seasonal ARIMA with exogenous
+    3. XGBoostForecaster    — gradient boosting with lag features
+    4. LightGBMForecaster   — LightGBM with lag features
+    5. ChronosForecaster    — Amazon Chronos-2 zero-shot (foundation model)
+    6. RoutingEnsemble      — cold-start routing logic
+    7. ProphetForecaster    — Facebook Prophet (fallback: seasonal decompose)
+    8. LSTMForecaster       — LSTM neural network (fallback: weighted rolling avg)
+    9. NBEATSForecaster     — N-BEATS neural architecture (fallback: polynomial + Fourier)
+   10. TFTForecaster        — Temporal Fusion Transformer (fallback: feature-weighted regression)
 """
 
 from __future__ import annotations
@@ -544,6 +548,504 @@ class RoutingEnsemble(ForecastModel):
 
 
 # ---------------------------------------------------------------------------
+# 7. Prophet Forecaster
+# ---------------------------------------------------------------------------
+
+
+class ProphetForecaster(ForecastModel):
+    """Facebook Prophet forecaster with automatic seasonality detection.
+
+    Falls back to statsmodels seasonal_decompose-based approach when
+    the ``prophet`` library is not installed.
+    """
+
+    def __init__(
+        self,
+        yearly_seasonality: bool = True,
+        weekly_seasonality: bool = True,
+        changepoint_prior_scale: float = 0.05,
+    ):
+        self.yearly_seasonality = yearly_seasonality
+        self.weekly_seasonality = weekly_seasonality
+        self.changepoint_prior_scale = changepoint_prior_scale
+        self._models: dict[str, Any] = {}
+        self._train_data: pd.DataFrame | None = None
+        self._use_prophet: bool = False
+
+    @property
+    def name(self) -> str:
+        return "prophet"
+
+    def fit(self, Y_train: pd.DataFrame, X_train: pd.DataFrame | None = None) -> "ProphetForecaster":
+        self._train_data = Y_train.copy()
+        try:
+            from prophet import Prophet  # type: ignore[import-untyped]
+
+            self._use_prophet = True
+            for uid, grp in Y_train.groupby("unique_id"):
+                grp = grp.sort_values("ds")
+                prophet_df = grp[["ds", "y"]].copy()
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    m = Prophet(
+                        yearly_seasonality=self.yearly_seasonality,
+                        weekly_seasonality=self.weekly_seasonality,
+                        changepoint_prior_scale=self.changepoint_prior_scale,
+                    )
+                    m.fit(prophet_df)
+                    self._models[str(uid)] = m
+            logger.info("model_fitted", model="prophet", n_series=len(self._models))
+        except ImportError:
+            logger.warning("prophet_not_installed", fallback="seasonal_decompose")
+            self._use_prophet = False
+            # Fallback: compute trend + seasonal component via statsmodels
+            from statsmodels.tsa.seasonal import seasonal_decompose
+
+            for uid, grp in Y_train.groupby("unique_id"):
+                grp = grp.sort_values("ds")
+                y = grp["y"].values
+                period = min(7, len(y) // 2) if len(y) >= 4 else 2
+                try:
+                    decomp = seasonal_decompose(y, model="additive", period=period, extrapolate_trend="freq")
+                    self._models[str(uid)] = {
+                        "trend_last": float(decomp.trend[~np.isnan(decomp.trend)][-1]),
+                        "trend_slope": float(np.polyfit(range(len(y)), y, 1)[0]),
+                        "seasonal": decomp.seasonal[-period:].tolist(),
+                        "period": period,
+                    }
+                except Exception:
+                    self._models[str(uid)] = {
+                        "trend_last": float(np.mean(y[-30:])),
+                        "trend_slope": 0.0,
+                        "seasonal": [0.0],
+                        "period": 1,
+                    }
+        return self
+
+    def predict(self, h: int, X_future: pd.DataFrame | None = None) -> pd.DataFrame:
+        if self._train_data is None:
+            return pd.DataFrame(columns=["unique_id", "ds", "y_hat"])
+
+        records = []
+        for uid, grp in self._train_data.groupby("unique_id"):
+            grp = grp.sort_values("ds")
+            last_ds = grp["ds"].iloc[-1]
+            future_dates = pd.date_range(start=last_ds + pd.Timedelta(days=1), periods=h, freq="D")
+
+            if self._use_prophet and str(uid) in self._models:
+                future_df = pd.DataFrame({"ds": future_dates})
+                forecast = self._models[str(uid)].predict(future_df)
+                for ds, yhat in zip(future_dates, forecast["yhat"].values):
+                    records.append({"unique_id": uid, "ds": ds, "y_hat": max(0, float(yhat))})
+            elif str(uid) in self._models:
+                info = self._models[str(uid)]
+                for step, ds in enumerate(future_dates):
+                    seasonal_val = info["seasonal"][step % info["period"]]
+                    yhat = info["trend_last"] + info["trend_slope"] * (step + 1) + seasonal_val
+                    records.append({"unique_id": uid, "ds": ds, "y_hat": max(0, float(yhat))})
+
+        return pd.DataFrame(records)
+
+
+# ---------------------------------------------------------------------------
+# 8. LSTM Forecaster
+# ---------------------------------------------------------------------------
+
+
+class LSTMForecaster(ForecastModel):
+    """LSTM recurrent neural network forecaster.
+
+    Falls back to exponentially-weighted rolling average when PyTorch
+    is not installed.
+    """
+
+    def __init__(
+        self,
+        hidden_size: int = 32,
+        num_layers: int = 1,
+        lookback: int = 30,
+        epochs: int = 50,
+        learning_rate: float = 0.001,
+    ):
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.lookback = lookback
+        self.epochs = epochs
+        self.learning_rate = learning_rate
+        self._models: dict[str, Any] = {}
+        self._scalers: dict[str, tuple[float, float]] = {}
+        self._train_data: pd.DataFrame | None = None
+        self._use_torch: bool = False
+
+    @property
+    def name(self) -> str:
+        return "lstm"
+
+    def fit(self, Y_train: pd.DataFrame, X_train: pd.DataFrame | None = None) -> "LSTMForecaster":
+        self._train_data = Y_train.copy()
+        try:
+            import torch
+            import torch.nn as nn
+
+            self._use_torch = True
+
+            class _LSTMModel(nn.Module):
+                def __init__(self, hidden_size: int, num_layers: int):
+                    super().__init__()
+                    self.lstm = nn.LSTM(1, hidden_size, num_layers, batch_first=True)
+                    self.fc = nn.Linear(hidden_size, 1)
+
+                def forward(self, x: torch.Tensor) -> torch.Tensor:
+                    out, _ = self.lstm(x)
+                    return self.fc(out[:, -1, :])
+
+            for uid, grp in Y_train.groupby("unique_id"):
+                grp = grp.sort_values("ds")
+                y = grp["y"].values.astype(np.float32)
+                if len(y) < self.lookback + 1:
+                    continue
+                # Normalize
+                y_min, y_max = float(y.min()), float(y.max())
+                scale = y_max - y_min if y_max != y_min else 1.0
+                y_norm = (y - y_min) / scale
+                self._scalers[str(uid)] = (y_min, scale)
+
+                # Build sequences
+                X_seq, Y_seq = [], []
+                for i in range(len(y_norm) - self.lookback):
+                    X_seq.append(y_norm[i : i + self.lookback])
+                    Y_seq.append(y_norm[i + self.lookback])
+                X_t = torch.tensor(np.array(X_seq), dtype=torch.float32).unsqueeze(-1)
+                Y_t = torch.tensor(np.array(Y_seq), dtype=torch.float32).unsqueeze(-1)
+
+                model = _LSTMModel(self.hidden_size, self.num_layers)
+                optimizer = torch.optim.Adam(model.parameters(), lr=self.learning_rate)
+                loss_fn = nn.MSELoss()
+
+                model.train()
+                for _ in range(self.epochs):
+                    pred = model(X_t)
+                    loss = loss_fn(pred, Y_t)
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+
+                model.eval()
+                self._models[str(uid)] = model
+            logger.info("model_fitted", model="lstm", n_series=len(self._models))
+
+        except ImportError:
+            logger.warning("torch_not_installed", fallback="weighted_rolling_avg")
+            self._use_torch = False
+            # Fallback: store exponentially-weighted statistics
+            for uid, grp in Y_train.groupby("unique_id"):
+                grp = grp.sort_values("ds")
+                y = grp["y"].values
+                alpha = 2.0 / (min(self.lookback, len(y)) + 1)
+                weights = np.array([(1 - alpha) ** i for i in range(len(y))])[::-1]
+                weights /= weights.sum()
+                ewm_mean = float(np.dot(weights, y))
+                # Weighted trend from last lookback values
+                tail = y[-min(self.lookback, len(y)) :]
+                if len(tail) >= 2:
+                    slope = float(np.polyfit(range(len(tail)), tail, 1)[0])
+                else:
+                    slope = 0.0
+                self._models[str(uid)] = {"ewm_mean": ewm_mean, "slope": slope}
+        return self
+
+    def predict(self, h: int, X_future: pd.DataFrame | None = None) -> pd.DataFrame:
+        if self._train_data is None:
+            return pd.DataFrame(columns=["unique_id", "ds", "y_hat"])
+
+        records = []
+        for uid, grp in self._train_data.groupby("unique_id"):
+            grp = grp.sort_values("ds")
+            last_ds = grp["ds"].iloc[-1]
+            future_dates = pd.date_range(start=last_ds + pd.Timedelta(days=1), periods=h, freq="D")
+
+            if self._use_torch and str(uid) in self._models:
+                import torch
+
+                y = grp["y"].values.astype(np.float32)
+                y_min, scale = self._scalers[str(uid)]
+                y_norm = (y - y_min) / scale
+                model = self._models[str(uid)]
+                seq = y_norm[-self.lookback :].tolist()
+
+                model.eval()
+                with torch.no_grad():
+                    for ds in future_dates:
+                        x = torch.tensor([seq[-self.lookback :]], dtype=torch.float32).unsqueeze(-1)
+                        pred_norm = model(x).item()
+                        yhat = pred_norm * scale + y_min
+                        records.append({"unique_id": uid, "ds": ds, "y_hat": max(0, float(yhat))})
+                        seq.append(pred_norm)
+            elif str(uid) in self._models:
+                info = self._models[str(uid)]
+                for step, ds in enumerate(future_dates):
+                    yhat = info["ewm_mean"] + info["slope"] * (step + 1)
+                    records.append({"unique_id": uid, "ds": ds, "y_hat": max(0, float(yhat))})
+
+        return pd.DataFrame(records)
+
+
+# ---------------------------------------------------------------------------
+# 9. N-BEATS Forecaster
+# ---------------------------------------------------------------------------
+
+
+class NBEATSForecaster(ForecastModel):
+    """N-BEATS neural architecture for time series forecasting.
+
+    Falls back to polynomial trend + Fourier harmonics decomposition
+    when ``neuralforecast`` is not installed.
+    """
+
+    def __init__(
+        self,
+        input_size: int = 30,
+        h: int = 14,
+        max_steps: int = 100,
+        n_harmonics: int = 3,
+        poly_degree: int = 2,
+    ):
+        self.input_size = input_size
+        self._h = h
+        self.max_steps = max_steps
+        self.n_harmonics = n_harmonics
+        self.poly_degree = poly_degree
+        self._nf = None
+        self._train_data: pd.DataFrame | None = None
+        self._use_neuralforecast: bool = False
+        self._models: dict[str, Any] = {}
+
+    @property
+    def name(self) -> str:
+        return "nbeats"
+
+    def fit(self, Y_train: pd.DataFrame, X_train: pd.DataFrame | None = None) -> "NBEATSForecaster":
+        self._train_data = Y_train.copy()
+        try:
+            from neuralforecast import NeuralForecast  # type: ignore[import-untyped]
+            from neuralforecast.models import NBEATS  # type: ignore[import-untyped]
+
+            self._use_neuralforecast = True
+            nbeats_model = NBEATS(
+                input_size=self.input_size,
+                h=self._h,
+                max_steps=self.max_steps,
+                scaler_type="standard",
+            )
+            nf = NeuralForecast(models=[nbeats_model], freq="D")
+            nf.fit(df=Y_train)
+            self._nf = nf
+            logger.info("model_fitted", model="nbeats", backend="neuralforecast")
+        except ImportError:
+            logger.warning("neuralforecast_not_installed", fallback="poly_fourier")
+            self._use_neuralforecast = False
+            # Fallback: polynomial trend + Fourier harmonics
+            for uid, grp in Y_train.groupby("unique_id"):
+                grp = grp.sort_values("ds")
+                y = grp["y"].values.astype(np.float64)
+                n = len(y)
+                t = np.arange(n, dtype=np.float64)
+
+                # Polynomial trend
+                poly_coeffs = np.polyfit(t, y, min(self.poly_degree, max(1, n - 1)))
+
+                # Fourier harmonics on residuals
+                trend_vals = np.polyval(poly_coeffs, t)
+                residuals = y - trend_vals
+                harmonics = []
+                period = min(7.0, float(n) / 2)
+                for k in range(1, self.n_harmonics + 1):
+                    cos_k = np.cos(2 * np.pi * k * t / period)
+                    sin_k = np.sin(2 * np.pi * k * t / period)
+                    a_k = 2.0 * np.dot(residuals, cos_k) / n
+                    b_k = 2.0 * np.dot(residuals, sin_k) / n
+                    harmonics.append((a_k, b_k, period / k))
+
+                self._models[str(uid)] = {
+                    "poly_coeffs": poly_coeffs.tolist(),
+                    "harmonics": harmonics,
+                    "n": n,
+                    "period": period,
+                }
+        return self
+
+    def predict(self, h: int, X_future: pd.DataFrame | None = None) -> pd.DataFrame:
+        if self._train_data is None:
+            return pd.DataFrame(columns=["unique_id", "ds", "y_hat"])
+
+        if self._use_neuralforecast and self._nf is not None:
+            forecasts = self._nf.predict()
+            forecasts = forecasts.reset_index()
+            # NeuralForecast column name is the model class name
+            yhat_col = [c for c in forecasts.columns if c not in ("unique_id", "ds")]
+            if yhat_col:
+                forecasts = forecasts.rename(columns={yhat_col[0]: "y_hat"})
+            forecasts["y_hat"] = forecasts["y_hat"].clip(lower=0)
+            return forecasts[["unique_id", "ds", "y_hat"]].head(
+                h * self._train_data["unique_id"].nunique()
+            )
+
+        records = []
+        for uid, grp in self._train_data.groupby("unique_id"):
+            grp = grp.sort_values("ds")
+            last_ds = grp["ds"].iloc[-1]
+            future_dates = pd.date_range(start=last_ds + pd.Timedelta(days=1), periods=h, freq="D")
+
+            if str(uid) not in self._models:
+                continue
+
+            info = self._models[str(uid)]
+            poly_coeffs = np.array(info["poly_coeffs"])
+            n = info["n"]
+            period = info["period"]
+
+            for step, ds in enumerate(future_dates):
+                t_val = float(n + step)
+                yhat = float(np.polyval(poly_coeffs, t_val))
+                for a_k, b_k, _ in info["harmonics"]:
+                    yhat += a_k * np.cos(2 * np.pi * (step + 1) / period)
+                    yhat += b_k * np.sin(2 * np.pi * (step + 1) / period)
+                records.append({"unique_id": uid, "ds": ds, "y_hat": max(0, float(yhat))})
+
+        return pd.DataFrame(records)
+
+
+# ---------------------------------------------------------------------------
+# 10. Temporal Fusion Transformer (TFT)
+# ---------------------------------------------------------------------------
+
+
+class TFTForecaster(ForecastModel):
+    """Temporal Fusion Transformer for multi-horizon forecasting.
+
+    Falls back to sklearn feature-weighted linear regression when
+    neural libraries are not installed.
+    """
+
+    def __init__(
+        self,
+        input_size: int = 30,
+        h: int = 14,
+        max_steps: int = 100,
+    ):
+        self.input_size = input_size
+        self._h = h
+        self.max_steps = max_steps
+        self._nf = None
+        self._train_data: pd.DataFrame | None = None
+        self._use_neural: bool = False
+        self._models: dict[str, Any] = {}
+
+    @property
+    def name(self) -> str:
+        return "tft"
+
+    def fit(self, Y_train: pd.DataFrame, X_train: pd.DataFrame | None = None) -> "TFTForecaster":
+        self._train_data = Y_train.copy()
+        try:
+            from neuralforecast import NeuralForecast  # type: ignore[import-untyped]
+            from neuralforecast.models import TFT  # type: ignore[import-untyped]
+
+            self._use_neural = True
+            tft_model = TFT(
+                input_size=self.input_size,
+                h=self._h,
+                max_steps=self.max_steps,
+                scaler_type="standard",
+            )
+            nf = NeuralForecast(models=[tft_model], freq="D")
+            nf.fit(df=Y_train)
+            self._nf = nf
+            logger.info("model_fitted", model="tft", backend="neuralforecast")
+        except ImportError:
+            logger.warning("neuralforecast_not_installed", fallback="feature_weighted_regression")
+            self._use_neural = False
+            from sklearn.linear_model import Ridge
+
+            for uid, grp in Y_train.groupby("unique_id"):
+                grp = grp.sort_values("ds")
+                y = grp["y"].values
+                n = len(y)
+                if n < 4:
+                    self._models[str(uid)] = {"mean": float(np.mean(y))}
+                    continue
+
+                # Build features: trend, day_of_week, lag-based
+                t = np.arange(n, dtype=np.float64)
+                dow = np.array([d.dayofweek for d in grp["ds"]], dtype=np.float64)
+                month = np.array([d.month for d in grp["ds"]], dtype=np.float64)
+                lag1 = np.roll(y, 1)
+                lag1[0] = y[0]
+                lag7 = np.roll(y, 7)
+                lag7[:7] = y[0]
+
+                X_feat = np.column_stack([t, dow, month, lag1, lag7])
+                reg = Ridge(alpha=1.0)
+                reg.fit(X_feat, y)
+                self._models[str(uid)] = {
+                    "model": reg,
+                    "n": n,
+                    "last_values": y[-max(7, 1) :].tolist(),
+                }
+            logger.info("model_fitted", model="tft", backend="sklearn_fallback", n_series=len(self._models))
+        return self
+
+    def predict(self, h: int, X_future: pd.DataFrame | None = None) -> pd.DataFrame:
+        if self._train_data is None:
+            return pd.DataFrame(columns=["unique_id", "ds", "y_hat"])
+
+        if self._use_neural and self._nf is not None:
+            forecasts = self._nf.predict()
+            forecasts = forecasts.reset_index()
+            yhat_col = [c for c in forecasts.columns if c not in ("unique_id", "ds")]
+            if yhat_col:
+                forecasts = forecasts.rename(columns={yhat_col[0]: "y_hat"})
+            forecasts["y_hat"] = forecasts["y_hat"].clip(lower=0)
+            return forecasts[["unique_id", "ds", "y_hat"]].head(
+                h * self._train_data["unique_id"].nunique()
+            )
+
+        records = []
+        for uid, grp in self._train_data.groupby("unique_id"):
+            grp = grp.sort_values("ds")
+            last_ds = grp["ds"].iloc[-1]
+            future_dates = pd.date_range(start=last_ds + pd.Timedelta(days=1), periods=h, freq="D")
+
+            if str(uid) not in self._models:
+                continue
+
+            info = self._models[str(uid)]
+            if "model" not in info:
+                # Simple mean fallback
+                for ds in future_dates:
+                    records.append({"unique_id": uid, "ds": ds, "y_hat": max(0, info["mean"])})
+                continue
+
+            reg = info["model"]
+            n = info["n"]
+            history = info["last_values"][:]
+
+            for step, ds in enumerate(future_dates):
+                t_val = float(n + step)
+                dow_val = float(ds.dayofweek)
+                month_val = float(ds.month)
+                lag1_val = history[-1] if history else 0.0
+                lag7_val = history[-7] if len(history) >= 7 else history[0]
+                features = np.array([[t_val, dow_val, month_val, lag1_val, lag7_val]])
+                yhat = float(reg.predict(features)[0])
+                yhat = max(0, yhat)
+                records.append({"unique_id": uid, "ds": ds, "y_hat": yhat})
+                history.append(yhat)
+
+        return pd.DataFrame(records)
+
+
+# ---------------------------------------------------------------------------
 # Factory
 # ---------------------------------------------------------------------------
 
@@ -558,6 +1060,10 @@ class ForecastModelFactory:
         "lightgbm": LightGBMForecaster,
         "chronos2_zs": ChronosForecaster,
         "routing_ensemble": RoutingEnsemble,
+        "prophet": ProphetForecaster,
+        "lstm": LSTMForecaster,
+        "nbeats": NBEATSForecaster,
+        "tft": TFTForecaster,
     }
 
     @classmethod
@@ -614,6 +1120,38 @@ class ForecastModelFactory:
         models["routing_ensemble"] = RoutingEnsemble(
             cold_start_threshold_days=routing_cfg.get("cold_start_threshold_days", 60),
             intermittency_threshold=routing_cfg.get("intermittency_threshold", 0.5),
+        )
+
+        prophet_cfg = config.get("prophet", {})
+        models["prophet"] = ProphetForecaster(
+            yearly_seasonality=prophet_cfg.get("yearly_seasonality", True),
+            weekly_seasonality=prophet_cfg.get("weekly_seasonality", True),
+            changepoint_prior_scale=prophet_cfg.get("changepoint_prior_scale", 0.05),
+        )
+
+        lstm_cfg = config.get("lstm", {})
+        models["lstm"] = LSTMForecaster(
+            hidden_size=lstm_cfg.get("hidden_size", 32),
+            num_layers=lstm_cfg.get("num_layers", 1),
+            lookback=lstm_cfg.get("lookback", 30),
+            epochs=lstm_cfg.get("epochs", 50),
+            learning_rate=lstm_cfg.get("learning_rate", 0.001),
+        )
+
+        nbeats_cfg = config.get("nbeats", {})
+        models["nbeats"] = NBEATSForecaster(
+            input_size=nbeats_cfg.get("input_size", 30),
+            h=nbeats_cfg.get("horizon", 14),
+            max_steps=nbeats_cfg.get("max_steps", 100),
+            n_harmonics=nbeats_cfg.get("n_harmonics", 3),
+            poly_degree=nbeats_cfg.get("poly_degree", 2),
+        )
+
+        tft_cfg = config.get("tft", {})
+        models["tft"] = TFTForecaster(
+            input_size=tft_cfg.get("input_size", 30),
+            h=tft_cfg.get("horizon", 14),
+            max_steps=tft_cfg.get("max_steps", 100),
         )
 
         return models

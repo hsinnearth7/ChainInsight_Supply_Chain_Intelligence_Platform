@@ -1,7 +1,7 @@
 """ChainInsight ML Training DAG.
 
 Orchestrates the full training pipeline:
-validate_data -> generate_features -> [train_forecasters, train_rl] -> evaluate -> register -> promote
+validate_data -> generate_features -> train_forecasters -> evaluate -> register -> promote
 
 Schedule: Daily at 02:00 UTC
 """
@@ -83,21 +83,6 @@ def train_forecasters(**kwargs):
     ti.xcom_push(key="forecast_results", value=json.dumps(results, default=str))
 
 
-def train_rl(**kwargs):
-    """Train RL inventory optimization agent (PPO)."""
-    import json
-
-    ti = kwargs["ti"]
-
-    from app.rl.curriculum import CurriculumTrainer
-
-    trainer = CurriculumTrainer()
-    metrics = trainer.train()
-
-    ti.xcom_push(key="rl_results", value=json.dumps(metrics, default=str))
-    print(f"RL training complete — final cost: {metrics.get('final_cost', 'N/A')}")
-
-
 def evaluate(**kwargs):
     """Evaluate trained models using walk-forward cross-validation."""
     import json
@@ -105,7 +90,6 @@ def evaluate(**kwargs):
     ti = kwargs["ti"]
 
     forecast_results = json.loads(ti.xcom_pull(key="forecast_results") or "{}")
-    rl_results = json.loads(ti.xcom_pull(key="rl_results") or "{}")
 
     from app.forecasting.evaluation import WalkForwardEvaluator
 
@@ -114,7 +98,6 @@ def evaluate(**kwargs):
 
     combined = {
         "forecast_training": forecast_results,
-        "rl_training": rl_results,
         "evaluation": eval_report,
     }
 
@@ -216,12 +199,6 @@ t_forecast = PythonOperator(
     dag=dag,
 )
 
-t_rl = PythonOperator(
-    task_id="train_rl",
-    python_callable=train_rl,
-    dag=dag,
-)
-
 t_evaluate = PythonOperator(
     task_id="evaluate",
     python_callable=evaluate,
@@ -241,4 +218,4 @@ t_promote = PythonOperator(
 )
 
 # DAG dependencies
-t_validate >> t_features >> [t_forecast, t_rl] >> t_evaluate >> t_register >> t_promote
+t_validate >> t_features >> t_forecast >> t_evaluate >> t_register >> t_promote

@@ -1,13 +1,13 @@
 apiVersion: v2
 name: chaininsight
-description: End-to-end supply chain analytics platform with ML forecasting and RL optimization
+description: End-to-end supply chain analytics platform with ML forecasting and demand planning
 type: application
 version: 1.0.0
 appVersion: "3.0.0"
 keywords:
   - supply-chain
   - forecasting
-  - reinforcement-learning
+  - demand-planning
   - mlops
 maintainers:
   - name: ChainInsight Team

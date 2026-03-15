@@ -1,4 +1,4 @@
-"""Pipeline Orchestrator — coordinates ETL -> Stats -> Supply Chain -> ML -> RL."""
+"""Pipeline Orchestrator — coordinates ETL -> Stats -> Supply Chain -> ML -> Capacity -> Sensing -> S&OP."""
 
 import logging
 import uuid
@@ -7,7 +7,7 @@ from typing import Callable, Optional
 
 import pandas as pd
 
-from app.config import CHARTS_DIR, CLEAN_DIR, DEFAULT_RL_EPISODE_LENGTH, DEFAULT_RL_EPISODES, PipelineStatus
+from app.config import CHARTS_DIR, CLEAN_DIR, PipelineStatus
 from app.db.models import (
     AnalysisResult,
     InventorySnapshot,
@@ -15,12 +15,16 @@ from app.db.models import (
     SessionLocal,
     init_db,
 )
+from app.capacity.models import CapacityPlanner
+from app.capacity.visualization import plot_bottleneck_timeline, plot_utilization_timeline
 from app.pipeline.etl import ETLPipeline
 from app.pipeline.ml_engine import MLAnalyzer
 from app.pipeline.stats import StatisticalAnalyzer
 from app.pipeline.supply_chain import SupplyChainAnalyzer
-from app.rl.evaluator import RLEvaluator
-from app.rl.trainer import RLTrainer
+from app.sensing.signals import SignalProcessor
+from app.sensing.visualization import plot_forecast_adjustment, plot_signal_timeline
+from app.sop.simulator import SOPSimulator
+from app.sop.visualization import plot_demand_supply_balance, plot_scenario_comparison
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +32,7 @@ logger = logging.getLogger(__name__)
 class PipelineOrchestrator:
     """Coordinates the full analysis pipeline with progress callbacks."""
 
-    STAGES = ["etl", "stats", "supply_chain", "ml", "rl"]
+    STAGES = ["etl", "stats", "supply_chain", "ml", "capacity", "sensing", "sop"]
 
     def __init__(self, on_progress: Optional[Callable] = None):
         """
@@ -110,30 +114,94 @@ class PipelineOrchestrator:
             self._save_analysis(db, batch_id, "ml", ml_results.get("results", {}), ml_results.get("chart_paths", []))
             self.on_progress("ml", "completed", ml_results)
 
-            # Stage 5: RL Training & Evaluation
-            self.on_progress("rl", "running", {})
-            rl_env_kwargs = self._build_rl_env_kwargs(df_clean)
-            rl_trainer = RLTrainer(
-                n_episodes=DEFAULT_RL_EPISODES,
-                episode_length=DEFAULT_RL_EPISODE_LENGTH,
-                env_kwargs=rl_env_kwargs,
-            )
-            rl_trainer.train_all(on_progress=self.on_progress)
-            comparison_data = rl_trainer.get_comparison_data()
-
-            rl_evaluator = RLEvaluator(comparison_data, output_dir=str(charts_dir))
-            rl_chart_paths = rl_evaluator.generate_all_charts()
-            rl_kpis = rl_evaluator.get_kpis()
-
-            all_results["stages"]["rl"] = {
-                "kpis": rl_kpis,
-                "chart_paths": rl_chart_paths,
-                "comparison": comparison_data,
+            # Stage 5: Capacity Planning
+            self.on_progress("capacity", "running", {})
+            cap_planner = CapacityPlanner()
+            cap_demand = pd.DataFrame({
+                "period": [f"W{i+1}" for i in range(len(df_clean) // 7 or 4)],
+                "demand": [
+                    float(df_clean["Daily_Demand_Est"].sum()) / max(1, len(df_clean) // 7)
+                ] * (len(df_clean) // 7 or 4),
+            })
+            cap_report = cap_planner.check_feasibility(cap_demand)
+            cap_adjustments = cap_planner.suggest_adjustments(cap_report.bottlenecks)
+            cap_chart_paths = []
+            cap_chart_paths.append(plot_utilization_timeline(
+                cap_report.period_utilizations, str(charts_dir), cap_planner.utilization_target,
+            ))
+            cap_chart_paths.append(plot_bottleneck_timeline(
+                [{"period": b.period, "demand": b.demand, "capacity": b.capacity} for b in cap_report.bottlenecks],
+                str(charts_dir),
+            ))
+            cap_kpis = {
+                "avg_utilization": cap_report.avg_utilization,
+                "max_utilization": cap_report.max_utilization,
+                "bottleneck_count": cap_report.bottleneck_count,
+                "demand_coverage": cap_report.demand_coverage,
+                "feasible": cap_report.feasible,
+                "adjustments": len(cap_adjustments),
             }
-            rl_result_data = dict(rl_kpis) if isinstance(rl_kpis, dict) else {"kpis": rl_kpis}
-            rl_result_data["comparison_data"] = self._to_serializable(comparison_data)
-            self._save_analysis(db, batch_id, "rl", rl_result_data, rl_chart_paths)
-            self.on_progress("rl", "completed", rl_kpis)
+            all_results["stages"]["capacity"] = {"kpis": cap_kpis, "chart_paths": cap_chart_paths}
+            self._save_analysis(db, batch_id, "capacity", cap_kpis, cap_chart_paths)
+            self.on_progress("capacity", "completed", cap_kpis)
+
+            # Stage 6: Demand Sensing
+            self.on_progress("sensing", "running", {})
+            sensor = SignalProcessor()
+            product_ids = df_clean["Product_ID"].unique().tolist() if "Product_ID" in df_clean.columns else []
+            signals = sensor.generate_synthetic_signals(product_ids)
+            spikes = sensor.detect_spikes(signals)
+            sense_base = pd.DataFrame({
+                "product_id": product_ids[:10],
+                "period": [1] * min(10, len(product_ids)),
+                "forecast": [float(df_clean["Daily_Demand_Est"].mean())] * min(10, len(product_ids)),
+            }) if product_ids else pd.DataFrame(columns=["product_id", "period", "forecast"])
+            sense_adjusted = sensor.compute_sensing_adjustment(sense_base, signals)
+            sense_chart_paths = []
+            sense_chart_paths.append(plot_signal_timeline(
+                [{"source": s.source, "signal_value": s.signal_value} for s in signals[:100]],
+                str(charts_dir),
+            ))
+            adj_records = sense_adjusted.to_dict("records") if not sense_adjusted.empty else []
+            sense_chart_paths.append(plot_forecast_adjustment(adj_records, str(charts_dir)))
+            avg_adj = float(sense_adjusted["adjustment_pct"].abs().mean()) if not sense_adjusted.empty else 0.0
+            sense_kpis = {
+                "active_signals": len(signals),
+                "spike_count": len(spikes),
+                "avg_adjustment_pct": avg_adj,
+                "products_sensed": len(sense_adjusted),
+            }
+            all_results["stages"]["sensing"] = {"kpis": sense_kpis, "chart_paths": sense_chart_paths}
+            self._save_analysis(db, batch_id, "sensing", sense_kpis, sense_chart_paths)
+            self.on_progress("sensing", "completed", sense_kpis)
+
+            # Stage 7: S&OP Simulation
+            self.on_progress("sop", "running", {})
+            sop_sim = SOPSimulator()
+            daily_cap = sum(
+                p.max_throughput_per_day * p.efficiency_factor
+                for p in cap_planner.build_default_profiles()
+            )
+            sop_report = sop_sim.compare_scenarios(cap_demand, daily_cap)
+            best_result = next((r for r in sop_report.results if r.scenario_name == sop_report.best_scenario), sop_report.results[0])
+            sop_chart_paths = []
+            sop_chart_paths.append(plot_demand_supply_balance(best_result.period_details, str(charts_dir)))
+            sop_chart_paths.append(plot_scenario_comparison(
+                [{"scenario_name": r.scenario_name, "fill_rate": r.fill_rate,
+                  "avg_utilization": r.avg_utilization, "total_inventory_cost": r.total_inventory_cost}
+                 for r in sop_report.results],
+                str(charts_dir),
+            ))
+            sop_kpis = {
+                "fill_rate": best_result.fill_rate,
+                "avg_utilization": best_result.avg_utilization,
+                "best_scenario": sop_report.best_scenario,
+                "balance_pct": best_result.fill_rate,
+                "scenarios": [sop_sim.calculate_kpis(r) for r in sop_report.results],
+            }
+            all_results["stages"]["sop"] = {"kpis": sop_kpis, "chart_paths": sop_chart_paths}
+            self._save_analysis(db, batch_id, "sop", sop_kpis, sop_chart_paths)
+            self.on_progress("sop", "completed", sop_kpis)
 
             # Mark pipeline complete
             run_record.status = PipelineStatus.COMPLETED.value
@@ -193,18 +261,6 @@ class PipelineOrchestrator:
             chart_paths=chart_paths,
         ))
         db.commit()
-
-    @staticmethod
-    def _build_rl_env_kwargs(df: pd.DataFrame) -> dict:
-        """Build InventoryEnv kwargs from cleaned data statistics."""
-        return {
-            "unit_cost": float(df["Unit_Cost"].median()),
-            "daily_demand_mean": float(df["Daily_Demand_Est"].mean()),
-            "daily_demand_std": float(df["Daily_Demand_Est"].std()),
-            "lead_time": int(df["Lead_Time_Days"].median()),
-            "safety_stock": float(df["Safety_Stock_Target"].median()),
-            "max_stock": float(df["Current_Stock"].quantile(0.95) * 2),
-        }
 
     def _to_serializable(self, obj):
         """Recursively convert numpy types to Python native types."""

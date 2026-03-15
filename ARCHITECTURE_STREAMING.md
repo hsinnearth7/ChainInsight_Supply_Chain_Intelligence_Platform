@@ -35,11 +35,11 @@ CSV 輸入 → ETL 清洗 → 統計分析 → 供應鏈優化 → ML 分析 →
                     └──────┬───────┬───────┬───────┬───┘
                            │       │       │       │
                     ┌──────▾──┐ ┌──▾─────┐ ┌▾─────┐ ┌▾──────────┐
-                    │  ETL    │ │ Stats  │ │ SCM  │ │  ML + RL  │
+                    │  ETL    │ │ Stats  │ │ SCM  │ │  ML + Planning  │
                     │ Pipeline│ │Analysis│ │Optim.│ │  Engine   │
                     │         │ │        │ │      │ │           │
                     │ 8-step  │ │chart   │ │EOQ   │ │ 30 algos │
-                    │ cleaning│ │01-08   │ │Monte │ │ + RL new  │
+                    │ cleaning│ │01-08   │ │Monte │ │ + S&OP  │
                     │         │ │Carlo │ │           │
                     └────┬────┘ └───┬────┘ └──┬───┘ └─────┬─────┘
                          │         │          │           │
@@ -62,7 +62,7 @@ CSV 輸入 → ETL 清洗 → 統計分析 → 供應鏈優化 → ML 分析 →
                     │  • KPI 即時更新 (無需刷新)                │
                     │  • 互動式圖表 (zoom/filter/drill-down)   │
                     │  • Pipeline 進度條                       │
-                    │  • RL Agent 決策即時視覺化                │
+                    │  • S&OP 情境分析即時視覺化                │
                     └──────────────────────────────────────────┘
 ```
 
@@ -89,7 +89,7 @@ ws_manager = ConnectionManager()
 async def ingest_data(file: UploadFile):
     """新資料上傳後自動觸發完整 pipeline"""
     raw_path = save_upload(file)
-    # 非同步觸發：ETL → Stats → SCM → ML → RL
+    # 非同步觸發：ETL → Stats → SCM → ML → Capacity → Sensing → S&OP
     task = trigger_full_pipeline.delay(raw_path)
     return {"task_id": task.id, "status": "pipeline_started"}
 
@@ -113,7 +113,7 @@ def trigger_full_pipeline(raw_path: str):
         stats_task.s(),                  # Step 2: 統計分析
         supply_chain_task.s(),           # Step 3: 供應鏈優化
         ml_task.s(),                     # Step 4: ML 30 algos
-        rl_task.s(),                     # Step 5: RL 動態決策 ← 新增!
+        sop_task.s(),                    # Step 5: S&OP 情境模擬
         publish_results.s(),             # Step 6: 推送到 Dashboard
     )
     return workflow.apply_async()
@@ -136,12 +136,12 @@ def trigger_full_pipeline(raw_path: str):
 前端 (React + TypeScript)
 ├── components/
 │   ├── KPIDashboard.tsx        # 6 個 KPI 即時卡片
-│   ├── PipelineProgress.tsx    # 流程進度條 (ETL → Stats → ML → RL)
+│   ├── PipelineProgress.tsx    # 流程進度條 (ETL → Stats → ML → Capacity → Sensing → S&OP)
 │   ├── InteractiveCharts/
 │   │   ├── CorrelationMatrix.tsx   # Plotly heatmap (可互動)
 │   │   ├── MonteCarloSim.tsx       # 動態 Monte Carlo 模擬
 │   │   ├── EOQOptimizer.tsx        # 拖動參數即時重算 EOQ
-│   │   ├── RLDecisionViz.tsx       # RL Agent 決策軌跡
+│   │   ├── SOPScenarioViz.tsx      # S&OP 情境比較
 │   │   └── InventoryHealthMap.tsx  # ABC 分類 + 風險熱力圖
 │   ├── DataUploader.tsx         # 拖拽上傳 CSV
 │   └── AlertPanel.tsx           # 即時缺貨警報
@@ -160,124 +160,31 @@ def trigger_full_pipeline(raw_path: str):
 
 ### 模組 3：Reinforcement Learning 引擎（核心新增）
 
-目前有 GA（遺傳演算法）做靜態安全庫存最佳化。RL 的價值在於：**它能根據環境回饋持續學習最佳策略，不只是一次性最佳化。**
+目前有 GA（遺傳演算法）做靜態安全庫存最佳化。S&OP 模擬的價值在於：**它能透過情境分析比較不同策略的 KPI 表現，支持數據驅動的決策。**
 
-#### RL 應用場景設計
+#### 需求規劃應用場景設計
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                  RL for Supply Chain                      │
+│             Demand Planning for Supply Chain              │
 ├─────────────────────────────────────────────────────────┤
 │                                                          │
-│  場景 1: 動態補貨決策 (Dynamic Reorder Agent)             │
+│  模組 1: 產能規劃 (Capacity Planning)                    │
 │  ─────────────────────────────────────────                │
-│  State:  [庫存量, 需求趨勢, Lead_Time, 季節, 缺貨天數]    │
-│  Action: [不補貨, 補少量, 補 EOQ 量, 緊急大量補貨]        │
-│  Reward: -持有成本 - 缺貨損失 + 服務水平獎勵             │
+│  輸入: 需求預測、產線 Profile、稼動率目標               │
+│  輸出: 可行性報告、瓶頸偵測、調整建議                   │
 │                                                          │
-│  場景 2: 動態定價/折扣策略 (Pricing Agent)                │
+│  模組 2: 需求感知 (Demand Sensing)                       │
 │  ─────────────────────────────────────────                │
-│  State:  [庫存量, 需求彈性, 競爭價格, 剩餘保質期]         │
-│  Action: [維持原價, 小幅降價, 大幅促銷, 加價]             │
-│  Reward: 毛利 × 銷量 - 庫存持有成本                      │
+│  輸入: POS 資料、社群訊號、天氣資料                     │
+│  輸出: 調整後預測、需求突增偵測                         │
 │                                                          │
-│  場景 3: 多倉庫調撥 (Inventory Balancing Agent)           │
+│  模組 3: S&OP 模擬器 (S&OP Simulator)                    │
 │  ─────────────────────────────────────────                │
-│  State:  [各倉庫存量, 各倉需求, 調撥成本矩陣]            │
-│  Action: [不調撥, A→B 調撥, B→A 調撥, 調撥量]           │
-│  Reward: -總缺貨成本 - 調撥成本 + 服務水平獎勵           │
+│  輸入: 基準預測、產能限制、供應限制                     │
+│  輸出: 情境比較 (Fill Rate, 庫存成本, 稼動率)           │
 │                                                          │
 └─────────────────────────────────────────────────────────┘
-```
-
-#### RL 實作架構
-
-```python
-# app/rl/environment.py — 供應鏈模擬環境 (Gymnasium 介面)
-import gymnasium as gym
-import numpy as np
-
-class InventoryEnv(gym.Env):
-    """
-    模擬一個品類的庫存管理環境
-    - 每個 time step = 1 天
-    - Agent 決定補貨量
-    - 環境回傳需求（隨機）、缺貨懲罰、持有成本
-    """
-    def __init__(self, category_data, config):
-        self.demand_mean = category_data['daily_demand_mean']
-        self.demand_std = category_data['daily_demand_std']
-        self.unit_cost = category_data['avg_unit_cost']
-        self.lead_time = category_data['avg_lead_time']
-        self.holding_rate = config.get('holding_rate', 0.25 / 365)
-        self.stockout_penalty = config.get('stockout_penalty', 2.0)
-
-        # State: [current_stock, pending_orders, days_since_last_order,
-        #         demand_trend_7d, stockout_flag]
-        self.observation_space = gym.spaces.Box(
-            low=0, high=np.inf, shape=(5,), dtype=np.float32
-        )
-        # Action: 離散補貨決策
-        # 0=不補, 1=補0.5×EOQ, 2=補1×EOQ, 3=補1.5×EOQ, 4=補2×EOQ
-        self.action_space = gym.spaces.Discrete(5)
-
-    def step(self, action):
-        order_qty = action * 0.5 * self.eoq
-        demand = max(0, np.random.normal(self.demand_mean, self.demand_std))
-        self.stock = max(0, self.stock - demand)
-        self._process_arrivals()
-        if action > 0:
-            self._place_order(order_qty)
-        holding_cost = self.stock * self.unit_cost * self.holding_rate
-        stockout_cost = max(0, demand - self.stock) * self.unit_cost * self.stockout_penalty
-        reward = -(holding_cost + stockout_cost)
-        return self._get_obs(), reward, False, False, self._get_info()
-```
-
-#### RL 演算法實作路線
-
-```
-Level 1 (基礎):
-├── Q-Learning (Tabular)      — 離散化 state/action，建立 Q-table
-├── SARSA                      — On-policy 版本的 Q-Learning
-└── ── 用既有的 7 個品類各訓練一個 agent
-
-Level 2 (進階):
-├── DQN (Deep Q-Network)       — Neural Network 取代 Q-table
-├── Double DQN                 — 解決 overestimation 問題
-└── Dueling DQN                — 分離 state-value 和 advantage
-
-Level 3 (前沿):
-├── PPO (Proximal Policy Optimization)  — 最穩定的 Policy Gradient
-├── A2C / A3C (Actor-Critic)            — 並行訓練
-└── SAC (Soft Actor-Critic)             — 適合連續動作空間
-```
-
-#### RL vs GA 的互補關係
-
-```
-┌──────────────────────────────────────────────────────┐
-│              GA + RL 混合策略                          │
-├──────────────────────────────────────────────────────┤
-│                                                      │
-│  GA (現有): 靜態最佳化                                │
-│  ├── 輸入: 歷史統計數據                              │
-│  ├── 輸出: 最佳安全庫存乘數 [0.5x ~ 3.0x]            │
-│  ├── 優點: 全域搜索、不受梯度限制                    │
-│  └── 限制: 不能適應環境變化、一次性計算              │
-│                                                      │
-│  RL (新增): 動態決策                                  │
-│  ├── 輸入: 即時庫存狀態 (每天/每小時)                │
-│  ├── 輸出: 當下最佳行動 (補貨?多少?何時?)           │
-│  ├── 優點: 持續學習、適應季節/趨勢變化              │
-│  └── 限制: 需要模擬環境、訓練時間較長               │
-│                                                      │
-│  ★ 混合方案:                                         │
-│  GA 找出全域最優參數 → 作為 RL 的初始策略           │
-│  RL 在 GA 基礎上做即時微調 → 適應當前環境           │
-│  每月用新資料重跑 GA → 更新 RL 的策略基準           │
-│                                                      │
-└──────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -321,18 +228,17 @@ class AnalysisResult(Base):
     chart_path = Column(String)
     created_at = Column(DateTime)
 
-class RLEpisode(Base):
-    """記錄 RL Agent 的訓練與決策歷程"""
-    __tablename__ = 'rl_episodes'
+class SOPScenarioResult(Base):
+    """儲存 S&OP 模擬情境結果"""
+    __tablename__ = 'sop_scenario_results'
     id = Column(Integer, primary_key=True)
-    agent_type = Column(String)
-    category = Column(String)
-    episode = Column(Integer)
-    total_reward = Column(Float)
-    avg_stockout_rate = Column(Float)
-    avg_holding_cost = Column(Float)
-    policy_snapshot = Column(JSON)
-    trained_at = Column(DateTime)
+    scenario_name = Column(String)
+    batch_id = Column(String, index=True)
+    fill_rate = Column(Float)
+    avg_utilization = Column(Float)
+    inventory_cost = Column(Float)
+    stockout_events = Column(Integer)
+    created_at = Column(DateTime)
 ```
 
 有了時間序列資料，就能解鎖之前標為 N/A 的演算法：
@@ -342,12 +248,9 @@ class RLEpisode(Base):
 | RNN (#23) | N/A (缺時間序列) | **可用** — 多批次資料形成時間序列 |
 | LSTM (#24) | N/A | **可用** — 需求預測 |
 | Transformer (#25) | N/A | **可用** — 多品類注意力機制 |
-| Q-Learning (#16) | N/A | **可用** — RL 環境已建立 |
-| SARSA (#17) | N/A | **可用** |
-| DQN (#18) | N/A | **可用** |
-| Policy Gradient (#19) | N/A | **可用** |
-| Actor-Critic (#20) | N/A | **可用** |
-| MDP (#29) | N/A | **可用** — InventoryEnv 就是 MDP |
+| S&OP Simulation | N/A | **可用** — 情境比較 + KPI 分析 |
+| Capacity Planning | N/A | **可用** — 瓶頸偵測 + 調整建議 |
+| Demand Sensing | N/A | **可用** — 訊號處理 + 預測調整 |
 
 **升級後：30 個演算法全部 Applied！**
 
@@ -374,7 +277,7 @@ CELERYBEAT_SCHEDULE = {
         'schedule': crontab(hour=6, minute=0),
     },
     'hourly-rl-update': {
-        'task': 'app.pipeline.rl_incremental_train',
+        'task': 'app.pipeline.sop_refresh',
         'schedule': crontab(minute=0),
     },
 }
@@ -398,8 +301,7 @@ async def erp_webhook(payload: InventoryUpdate):
 | **Task Queue** | Celery + Redis | 非同步 pipeline 執行 |
 | **Database** | SQLite (dev) → PostgreSQL (prod) | 結構化資料 + 時間序列 |
 | **Cache** | Redis | 即時 KPI + Session |
-| **RL Framework** | Gymnasium + Stable-Baselines3 | RL 環境 + 預訓練演算法 |
-| **Deep Learning** | PyTorch | DQN / PPO / LSTM |
+| **Planning** | Capacity + Sensing + S&OP | 需求規劃引擎 |
 | **前端** | React + Plotly.js (或 Streamlit 快速版) | 互動式儀表板 |
 | **即時通訊** | WebSocket (FastAPI 內建) | 推送更新到前端 |
 | **檔案監控** | Watchdog | 自動偵測新 CSV |
@@ -420,14 +322,14 @@ async def erp_webhook(payload: InventoryUpdate):
 ⑤ SQLite 儲存歷史分析結果
 ```
 
-### Phase 2 (RL 引擎)
+### Phase 2 (需求規劃引擎)
 
 ```
-⑥ InventoryEnv (Gymnasium 環境)
-⑦ Q-Learning + DQN 實作
-⑧ PPO / A2C 進階 RL
-⑨ GA→RL 混合策略 (GA 初始化 + RL 微調)
-⑩ RL 決策視覺化 (reward curve, policy heatmap)
+⑥ Capacity Planning (產能規劃、瓶頸偵測)
+⑦ Demand Sensing (需求訊號處理、突增偵測)
+⑧ S&OP Simulator (情境模擬、KPI 比較)
+⑨ 產能 vs 需求視覺化 (utilization timeline, bottleneck chart)
+⑩ S&OP 情境比較視覺化 (scenario comparison, demand-supply balance)
 ```
 
 ### Phase 3 (即時串流)
@@ -446,7 +348,7 @@ async def erp_webhook(payload: InventoryUpdate):
 ⑯ PostgreSQL 遷移
 ⑰ Docker + docker-compose
 ⑱ LSTM/Transformer 需求預測 (需累積時間序列)
-⑲ Multi-warehouse RL agent
+⑲ Multi-warehouse S&OP planning
 ⑳ CI/CD + 自動化測試
 ```
 
@@ -465,15 +367,15 @@ ChainInsight/
 │   │   ├── stats.py             # 重構的統計分析
 │   │   ├── supply_chain.py      # 重構的供應鏈優化
 │   │   └── ml_engine.py         # 重構的 ML 分析
-│   ├── rl/
-│   │   ├── environment.py       # Gymnasium InventoryEnv
-│   │   ├── agents/
-│   │   │   ├── q_learning.py    # Tabular Q-Learning
-│   │   │   ├── dqn.py           # Deep Q-Network
-│   │   │   ├── ppo.py           # Proximal Policy Optimization
-│   │   │   └── hybrid_ga_rl.py  # GA + RL 混合
-│   │   ├── trainer.py           # 訓練管理器
-│   │   └── evaluator.py         # 策略評估 + 比較
+│   ├── capacity/
+│   │   ├── models.py            # CapacityPlanner, bottleneck detection
+│   │   └── visualization.py     # Utilization timeline charts
+│   ├── sensing/
+│   │   ├── signals.py           # SignalProcessor, spike detection
+│   │   └── visualization.py     # Signal timeline charts
+│   ├── sop/
+│   │   ├── simulator.py         # SOPSimulator, scenario comparison
+│   │   └── visualization.py     # Demand-supply balance charts
 │   ├── db/
 │   │   ├── models.py            # SQLAlchemy 模型
 │   │   ├── session.py           # DB 連線管理
@@ -510,7 +412,7 @@ ChainInsight/
 | **觸發方式** | 手動跑 5 個腳本 | 上傳 CSV / API / 排程自動觸發 |
 | **圖表** | 23 張靜態 PNG | 互動式 Plotly (zoom/filter/drill-down) |
 | **儀表板** | 靜態 HTML 讀 CSV | WebSocket 即時串流更新 |
-| **最佳化** | GA 一次性計算 | GA 全域搜索 + RL 持續動態調整 |
+| **最佳化** | GA 一次性計算 | GA 全域搜索 + S&OP 情境模擬 |
 | **ML 覆蓋** | 20/30 演算法 | **30/30 全部 Applied** |
 | **資料儲存** | 單一 CSV | DB + 時間序列 + 歷史版本 |
 | **部署** | `python xxx.py` | Docker 一鍵啟動 |

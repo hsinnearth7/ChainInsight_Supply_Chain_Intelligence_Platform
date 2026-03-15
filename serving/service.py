@@ -1,6 +1,6 @@
 """BentoML service for ChainInsight model serving.
 
-Exposes forecasting ensemble, RL inventory optimization, and drift detection
+Exposes forecasting ensemble, capacity planning, and drift detection
 as production-grade HTTP endpoints with batching and concurrency control.
 """
 
@@ -28,17 +28,13 @@ logger = logging.getLogger(__name__)
     },
 )
 class ChainInsightService:
-    """Unified model serving for forecasting, RL, and drift detection."""
+    """Unified model serving for forecasting, capacity planning, and drift detection."""
 
     def __init__(self) -> None:
         """Load all models on startup."""
         # Forecasting models
         self._forecasters: dict[str, Any] = {}
         self._load_forecasters()
-
-        # RL agent
-        self._rl_agent: Any = None
-        self._load_rl_agent()
 
         logger.info("ChainInsightService initialized with all models")
 
@@ -61,17 +57,6 @@ class ChainInsightService:
                 logger.warning("Model %s not found in BentoML store, skipping", name)
             except Exception:
                 logger.exception("Failed to load model %s", name)
-
-    def _load_rl_agent(self) -> None:
-        """Load PPO inventory optimization agent."""
-        try:
-            model_ref = bentoml.models.get("chaininsight-ppo-inventory:latest")
-            self._rl_agent = model_ref.load_model()
-            logger.info("Loaded RL agent: PPO inventory optimizer")
-        except bentoml.exceptions.NotFound:
-            logger.warning("RL agent not found in BentoML store")
-        except Exception:
-            logger.exception("Failed to load RL agent")
 
     def _route_model(self, history: list[float]) -> str:
         """Route to the best model based on history characteristics.
@@ -185,53 +170,6 @@ class ChainInsightService:
                 "error": str(e),
                 "model_attempted": model_key,
                 "forecast": [],
-            }
-
-    @bentoml.api()
-    def rl_optimize(
-        self,
-        state: list[float],
-    ) -> dict[str, Any]:
-        """Run PPO inventory optimization given current state.
-
-        Args:
-            state: Current environment state vector.
-                   [inventory_level, demand_forecast, lead_time, holding_cost, ordering_cost]
-                   per product (flattened for multi-product).
-
-        Returns:
-            Dictionary with recommended actions and expected cost.
-        """
-        if self._rl_agent is None:
-            return {
-                "error": "RL agent not loaded",
-                "action": [],
-            }
-
-        try:
-            state_arr = np.array(state, dtype=np.float32)
-
-            # Get action from trained PPO agent
-            action, _states = self._rl_agent.predict(state_arr, deterministic=True)
-
-            if isinstance(action, np.ndarray):
-                action_list = action.flatten().tolist()
-            else:
-                action_list = [float(action)]
-
-            return {
-                "action": action_list,
-                "state_dim": len(state),
-                "action_dim": len(action_list),
-                "policy": "PPO",
-                "deterministic": True,
-            }
-
-        except Exception as e:
-            logger.exception("RL optimization failed")
-            return {
-                "error": str(e),
-                "action": [],
             }
 
     @bentoml.api()

@@ -42,7 +42,7 @@ def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
     if not path.exists():
         raise FileNotFoundError(f"Config file not found: {path}")
 
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
     return config or {}
@@ -66,9 +66,19 @@ def get_eval_config() -> dict[str, Any]:
     return load_config().get("evaluation", {})
 
 
-def get_rl_config() -> dict[str, Any]:
-    """Get RL configuration."""
-    return load_config().get("rl", {})
+def get_capacity_config() -> dict[str, Any]:
+    """Get capacity planning configuration."""
+    return load_config().get("capacity", {})
+
+
+def get_sensing_config() -> dict[str, Any]:
+    """Get demand sensing configuration."""
+    return load_config().get("sensing", {})
+
+
+def get_sop_config() -> dict[str, Any]:
+    """Get S&OP simulation configuration."""
+    return load_config().get("sop", {})
 
 
 def get_supply_chain_config() -> dict[str, Any]:

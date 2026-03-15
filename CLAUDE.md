@@ -4,11 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ChainInsight — End-to-end supply chain analytics platform combining:
+ChainInsight — End-to-end demand planning engine combining:
 1. **Hierarchical Demand Forecasting** — Nixtla-format, 6-model routing ensemble (MAPE 10.3%), 4-layer hierarchy with MinTrace reconciliation
-2. **Curriculum-Learning RL** — Multi-product inventory optimization (PPO+SAC) with 3-phase curriculum
-3. **MLOps Infrastructure** — Feature store (AP > CP), Evidently drift monitoring, Pandera data contracts
-4. **Live Mode** — FastAPI + React SPA + SQLite with real-time WebSocket updates, 8-step ETL, 28+ charts
+2. **Capacity Planning** — Production capacity analysis, bottleneck detection, adjustment suggestions
+3. **Demand Sensing** — Near-term demand signal processing (POS, social, weather) with spike detection
+4. **S&OP Simulation** — Scenario-based Sales & Operations Planning with demand-supply balancing
+5. **MLOps Infrastructure** — Feature store (AP > CP), Evidently drift monitoring, Pandera data contracts
+6. **Live Mode** — FastAPI + React SPA + SQLite with real-time WebSocket updates, 7-stage pipeline
 
 ## Running
 
@@ -40,7 +42,7 @@ uvicorn app.main:app --reload --port 8000
 
 ```bash
 pip install -e ".[dev]"
-pytest tests/ -v                    # 163 tests across 14 files
+pytest tests/ -v                    # 155+ tests across 14 files
 pytest tests/ -v -m "not slow"      # Skip slow integration tests
 ruff check app/ tests/
 mypy app/
@@ -60,10 +62,10 @@ python -m app.forecasting.data_generator --validate-only # Validate only
 Primary configuration for all modules. Loaded via `app/settings.py` with `@lru_cache`:
 
 ```python
-from app.settings import get_data_config, get_model_config, get_rl_config
+from app.settings import get_data_config, get_model_config, get_capacity_config, get_sensing_config, get_sop_config
 ```
 
-Key sections: `data`, `model`, `evaluation`, `rl`, `supply_chain`, `monitoring`, `chart`, `server`
+Key sections: `data`, `model`, `evaluation`, `capacity`, `sensing`, `sop`, `supply_chain`, `monitoring`, `chart`, `server`
 
 ### Environment Variables (`.env`)
 
@@ -78,12 +80,12 @@ Synthetic Data Generator (Nixtla format, M5 properties, Pandera validation)
          │
     ┌────┴────────────────────────────────────────────┐
     ▼                                                  ▼
-Forecasting Pipeline                           RL Pipeline
+Forecasting Pipeline                           Planning Pipeline
     │                                                  │
-    ├── Feature Store (offline/online)         ├── Multi-Product Env (Gymnasium)
-    ├── 6 Models (routing ensemble)            ├── Curriculum Learning (3 phases)
-    ├── Hierarchical Reconciliation (MinTrace) ├── Classical Baselines (Newsvendor, (s,S), EOQ)
-    ├── Walk-Forward CV (12-fold)              └── PPO + SAC (stable-baselines3)
+    ├── Feature Store (offline/online)         ├── Capacity Planning (bottleneck detection)
+    ├── 6 Models (routing ensemble)            ├── Demand Sensing (signal processing)
+    ├── Hierarchical Reconciliation (MinTrace) └── S&OP Simulator (scenario comparison)
+    ├── Walk-Forward CV (12-fold)
     ├── Conformal Prediction Intervals
     └── Wilcoxon + Cohen's d significance
          │
@@ -93,11 +95,11 @@ MLOps      Live Mode
     │         │
     ├── Drift Monitor (KS, PSI, MAPE)    ├── FastAPI + React SPA
     └── Auto-retrain triggers             ├── WebSocket real-time updates
-                                          ├── 8-step ETL pipeline
-                                          └── 28+ charts
+                                          ├── 7-stage ETL pipeline
+                                          └── Charts per stage
 ```
 
-### Key Modules (v2.0 Additions)
+### Key Modules
 
 | Module | Path | Description |
 |--------|------|-------------|
@@ -111,14 +113,12 @@ MLOps      Live Mode
 | **Evaluation** | `app/forecasting/evaluation.py` | Walk-forward CV, Wilcoxon, Cohen's d, conformal prediction |
 | **Feature Store** | `app/forecasting/feature_store.py` | Offline/online dual-mode, eventual consistency |
 | **Drift Monitor** | `app/forecasting/drift_monitor.py` | KS data drift, PSI prediction drift, MAPE concept drift |
-| **Multi-Product Env** | `app/rl/multi_product_env.py` | Gymnasium env: continuous action space, stochastic lead time |
-| **Curriculum** | `app/rl/curriculum.py` | 3-phase progressive training (1→3→5 products) |
-| **RL Baselines** | `app/rl/baselines.py` | Newsvendor (stockpyl), (s,S), EOQ policy evaluation |
-
-### Key Modules (Original)
-
-| Module | Path | Description |
-|--------|------|-------------|
+| **Capacity Planner** | `app/capacity/models.py` | CapacityProfile, bottleneck detection, adjustment suggestions |
+| **Capacity Charts** | `app/capacity/visualization.py` | Utilization timeline, bottleneck demand vs capacity |
+| **Signal Processor** | `app/sensing/signals.py` | DemandSignal ingestion, spike detection, forecast adjustment |
+| **Sensing Charts** | `app/sensing/visualization.py` | Signal timeline, base vs adjusted forecast |
+| **S&OP Simulator** | `app/sop/simulator.py` | SOPScenario, multi-scenario simulation, KPI comparison |
+| **S&OP Charts** | `app/sop/visualization.py` | Demand-supply balance, scenario comparison bars |
 | Config | `app/config.py` | Settings, enums (`PipelineStatus`, `StockStatus`), constants |
 | Auth | `app/auth.py` | API Key authentication (`require_api_key` dependency) |
 | Enrichment | `app/pipeline/enrichment.py` | Shared `enrich_base()` (DSI, Coverage, Demand Intensity) |
@@ -126,14 +126,22 @@ MLOps      Live Mode
 | Stats | `app/pipeline/stats.py` | `StatisticalAnalyzer` — charts 0-8, KPIs |
 | Supply Chain | `app/pipeline/supply_chain.py` | `SupplyChainAnalyzer` — charts 9-14 |
 | ML Engine | `app/pipeline/ml_engine.py` | `MLAnalyzer` — charts 15-22, no data leakage |
-| Orchestrator | `app/pipeline/orchestrator.py` | `PipelineOrchestrator` — coordinates all stages |
-| RL Environment | `app/rl/environment.py` | Gymnasium `InventoryEnv` — 5-state, 5-action |
-| RL Agents | `app/rl/agents/*.py` | Q-Learning, SARSA, DQN, PPO, A2C, GA-RL Hybrid |
-| RL Trainer | `app/rl/trainer.py` | `RLTrainer` — seed control, convergence detection |
-| RL Evaluator | `app/rl/evaluator.py` | `RLEvaluator` — charts 23-28, KPI comparison |
+| Orchestrator | `app/pipeline/orchestrator.py` | `PipelineOrchestrator` — coordinates all 7 stages |
 | API Entry | `app/main.py` | FastAPI app with CORS, WS routes, watchdog, SPA mount |
 | DB Models | `app/db/models.py` | SQLAlchemy with FK relationships |
 | React Frontend | `frontend/` | Vite + React 18 + TypeScript + Tailwind + Recharts |
+
+## Pipeline Stages
+
+The orchestrator runs 7 stages in sequence:
+
+1. **ETL** — Data cleaning, validation, enrichment
+2. **Stats** — Statistical analysis, KPIs, distribution charts
+3. **Supply Chain** — EOQ, Monte Carlo, risk analysis
+4. **ML** — ML model training, feature importance, predictions
+5. **Capacity** — Capacity feasibility check, bottleneck detection, utilization charts
+6. **Sensing** — Demand signal generation, spike detection, forecast adjustment
+7. **S&OP** — Scenario simulation (baseline/optimistic/conservative), KPI comparison
 
 ## Forecasting Pipeline
 
@@ -168,22 +176,6 @@ MLOps      Live Mode
 - Cohen's d effect size (S<0.5, M=0.5-0.8, L>0.8)
 - Conformal prediction intervals (90% target coverage)
 
-## RL Pipeline
-
-### Curriculum Learning
-
-| Phase | Products | Demand | Lead Time | Steps |
-|-------|----------|--------|-----------|-------|
-| 1 | 1 | Normal | Fixed | 50K |
-| 2 | 3 | Seasonal | Fixed | 100K |
-| 3 | 5 | Intermittent | Stochastic | 200K |
-
-### Classical Baselines
-
-- **Newsvendor** (stockpyl): theoretical optimal cost
-- **(s,S) Policy**: reorder-point with fixed order quantity
-- **EOQ Policy**: economic order quantity
-
 ## MLOps
 
 ### Feature Store
@@ -211,7 +203,7 @@ MLOps      Live Mode
 
 ## Testing
 
-163 tests across 14 files:
+155+ tests across 14 files:
 
 | File | Tests | Coverage |
 |------|-------|----------|
@@ -222,10 +214,11 @@ MLOps      Live Mode
 | `test_feature_store.py` | 11 | Offline/online modes |
 | `test_drift_monitor.py` | 8 | 3 drift types |
 | `test_property_based.py` | 7 | Hypothesis invariants |
-| `test_multi_product_env.py` | 14 | Gymnasium env |
-| `test_rl_baselines.py` | 12 | Classical policies |
+| `test_capacity.py` | 8 | Capacity planning, bottleneck detection |
+| `test_sensing.py` | 8 | Demand sensing, spike detection |
+| `test_sop.py` | 9 | S&OP simulation, scenario comparison |
 | `test_config.py` | 16 | YAML config loading |
-| Original test files | 28 | ETL, API, RL, pipeline |
+| Original test files | 21 | ETL, API, pipeline |
 
 ## Development Guidelines
 - Always JSON-serialize datetime objects and numpy types before sending through WebSocket. Use `SafeEncoder` (see root CLAUDE.md).
@@ -247,7 +240,6 @@ MLOps      Live Mode
 Managed via `pyproject.toml` (PEP 621):
 - Core: `pandas`, `numpy`, `scipy`, `scikit-learn`, `pandera`, `pyyaml`, `structlog`
 - Forecasting: `statsforecast`, `hierarchicalforecast`, `lightgbm`, `xgboost`
-- RL: `gymnasium`, `torch`, `stable-baselines3`, `stockpyl`
 - MLOps: `evidently`
 - Live: `fastapi`, `uvicorn`, `sqlalchemy`, `websockets`, `watchdog`
 - Frontend: `react`, `react-router-dom`, `recharts`, `zustand`, `tailwindcss`, `vite`

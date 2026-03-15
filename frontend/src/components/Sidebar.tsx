@@ -9,7 +9,9 @@ const navItems: { to: string; labelKey: TranslationKey; icon: string }[] = [
   { to: '/stats', labelKey: 'nav.stats', icon: '📈' },
   { to: '/supply-chain', labelKey: 'nav.supplyChain', icon: '🔗' },
   { to: '/ml', labelKey: 'nav.ml', icon: '🤖' },
-  { to: '/rl', labelKey: 'nav.rl', icon: '🎯' },
+  { to: '/capacity', labelKey: 'nav.capacity', icon: '🏭' },
+  { to: '/sensing', labelKey: 'nav.sensing', icon: '📡' },
+  { to: '/sop', labelKey: 'nav.sop', icon: '📋' },
   { to: '/history', labelKey: 'nav.history', icon: '📋' },
 ];
 
