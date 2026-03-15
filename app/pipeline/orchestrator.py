@@ -7,6 +7,8 @@ from typing import Callable, Optional
 
 import pandas as pd
 
+from app.capacity.models import CapacityPlanner
+from app.capacity.visualization import plot_bottleneck_timeline, plot_utilization_timeline
 from app.config import CHARTS_DIR, CLEAN_DIR, PipelineStatus
 from app.db.models import (
     AnalysisResult,
@@ -15,8 +17,6 @@ from app.db.models import (
     SessionLocal,
     init_db,
 )
-from app.capacity.models import CapacityPlanner
-from app.capacity.visualization import plot_bottleneck_timeline, plot_utilization_timeline
 from app.pipeline.etl import ETLPipeline
 from app.pipeline.ml_engine import MLAnalyzer
 from app.pipeline.stats import StatisticalAnalyzer
@@ -183,7 +183,10 @@ class PipelineOrchestrator:
                 for p in cap_planner.build_default_profiles()
             )
             sop_report = sop_sim.compare_scenarios(cap_demand, daily_cap)
-            best_result = next((r for r in sop_report.results if r.scenario_name == sop_report.best_scenario), sop_report.results[0])
+            best_result = next(
+                (r for r in sop_report.results if r.scenario_name == sop_report.best_scenario),
+                sop_report.results[0],
+            )
             sop_chart_paths = []
             sop_chart_paths.append(plot_demand_supply_balance(best_result.period_details, str(charts_dir)))
             sop_chart_paths.append(plot_scenario_comparison(

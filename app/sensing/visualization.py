@@ -7,9 +7,9 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import numpy as np
 
 from app.config import CHART_BG_COLOR, CHART_DPI, CHART_TEXT_COLOR, COLOR_PALETTE
 
